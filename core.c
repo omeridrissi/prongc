@@ -61,7 +61,7 @@ struct prong_priv *prong_init_priv(char **argv, int funcs_pos, int num_funcs)
 	if (!prong_priv) 
 		goto exit;
 
-	memset(prong_priv, 0, sizeof(prong_priv));
+	memset(prong_priv, 0, sizeof(*prong_priv));
 
 	prong_priv->func_names = malloc(sizeof(char*)*num_funcs);
 	if (!prong_priv->func_names)
