@@ -1,17 +1,22 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O2
-LDFLAGS = -lclang
+CFLAGS = -Wall -Wextra -O2 -I/usr/lib/llvm-21/include 
+LDFLAGS = -L/usr/lib/llvm-21/lib -lclang
 
-SRC = prong.c
-OUT = build/prong
+SRC := $(wildcard *.c)
+OBJ := $(SRC:.c=.o)
+
+OUT = build/prongc
 
 .PHONY: all clean
 
 all: $(OUT)
 
-$(OUT): $(SRC)
+$(OUT): $(OBJ)
 	mkdir -p build
-	$(CC) $(CFLAGS) $(SRC) -o $(OUT) $(LDFLAGS)
+	$(CC) $(OBJ) -o $(OUT) $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf build
+	rm -rf build *.o
