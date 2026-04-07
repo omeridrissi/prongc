@@ -15,7 +15,7 @@ static enum CXChildVisitResult prong_visitor(CXCursor current_cursor,
 	enum CXCursorKind current_cursor_kind = clang_getCursorKind(current_cursor);
 	enum CXCursorKind parent_cursor_kind = clang_getCursorKind(parent_cursor);
 
-	char *elem_name = clang_getCString(parent_display_name);
+	const char *elem_name = clang_getCString(parent_display_name);
 
 	for (int i = 0; i < prong_priv->num_funcs; ++i) {
 		int func_name_len = strlen(prong_priv->func_names[i]);
