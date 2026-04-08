@@ -6,15 +6,19 @@
 
 #define DEFAULT_NUM_CURSORS 5
 
+extern bool arg_verbose;
+
 struct prong_priv {
 	char **func_names;
 	int num_funcs;
 	CXCursor *cursors;
 	int num_cursors;
+	int num_cursors_filled;
 };
 
 CXTranslationUnit	*alloc_tu_array(int length);
 CXCursor		*alloc_cursor_array(int length);
+void			prong_push_cursor(struct prong_priv *prong_priv, CXCursor *cursor);
 void process_tu_array(CXTranslationUnit *tu_array, int length, void *client_data);
 struct prong_priv *prong_init_priv(char **argv, int funcs_pos, int num_funcs);
 void prong_free_priv(struct prong_priv *prong_priv);

@@ -3,7 +3,9 @@
 #include <string.h>
 #include "core.h"
 
-static enum CXChildVisitResult prong_visitor(CXCursor current_cursor, 
+/* Visitor function for matching our specified function in args to our
+ * desired function definition in the AST */
+static enum CXChildVisitResult prong_visitor_match_func(CXCursor current_cursor, 
 					    CXCursor parent_cursor, 
 					    CXClientData client_data)
 {
@@ -11,7 +13,6 @@ static enum CXChildVisitResult prong_visitor(CXCursor current_cursor,
 
 	CXString parent_display_name = clang_getCursorDisplayName(parent_cursor);
 	
-//	CXType current_cursor_type = clang_getCursorType(current_cursor);
 	enum CXCursorKind current_cursor_kind = clang_getCursorKind(current_cursor);
 	enum CXCursorKind parent_cursor_kind = clang_getCursorKind(parent_cursor);
 
@@ -21,20 +22,36 @@ static enum CXChildVisitResult prong_visitor(CXCursor current_cursor,
 		int func_name_len = strlen(prong_priv->func_names[i]);
 		int elem_name_len = strlen(elem_name);
 
+		/* Match a specific function body definition */
 		if (
 		    (current_cursor_kind == CXCursor_CompoundStmt) &&
 		    (parent_cursor_kind == CXCursor_FunctionDecl) &&
 		    (func_name_len == elem_name_len-2) &&
 		    (strncmp(elem_name, prong_priv->func_names[i], elem_name_len-2) == 0)
 		    ) {
-			printf("Visiting element %s\n", clang_getCString(parent_display_name));
-			printf("	kind: %d\n", clang_getCursorKind(current_cursor));
+			if (arg_verbose) {
+				printf("Visiting element %s\n", clang_getCString(parent_display_name));
+				printf("	kind: %d\n", clang_getCursorKind(current_cursor));
+			}
+
+			prong_push_cursor(prong_priv, &parent_cursor);
+
+			return CXChildVisit_Continue;
 		}
 	}
 	
 	clang_disposeString(parent_display_name);
 	
 	return CXChildVisit_Recurse;
+}
+
+/* Visitor function for looping through the children of the compound 
+ * statement cursor relating to the function we've filtered out from the AST */
+static enum CXChildVisitResult prong_visitor_loop_stmt(CXCursor current_cursor,
+						CXCursor parent_cursor,
+						CXClientData client_data)
+{
+	
 }
 
 CXTranslationUnit *alloc_tu_array(int length) 
@@ -51,6 +68,15 @@ CXCursor *alloc_cursor_array(int length)
 	cursors = (CXCursor*)malloc(sizeof(CXCursor) * length);
 
 	return cursors;
+}
+
+void prong_push_cursor(struct prong_priv *prong_priv, CXCursor *cursor)
+{
+	if (prong_priv->num_cursors_filled < prong_priv->num_cursors) {
+		memcpy((prong_priv->cursors+prong_priv->num_cursors_filled+1), 
+				cursor, sizeof(CXCursor));
+		prong_priv->num_cursors_filled++;
+	}
 }
 
 struct prong_priv *prong_init_priv(char **argv, int funcs_pos, int num_funcs) 
@@ -72,10 +98,10 @@ struct prong_priv *prong_init_priv(char **argv, int funcs_pos, int num_funcs)
 	}
 	prong_priv->num_funcs = num_funcs;
 
-	prong_priv->cursors = alloc_cursor_array(DEFAULT_NUM_CURSORS);
+	prong_priv->cursors = alloc_cursor_array(num_funcs);
 	if (!prong_priv->cursors)
 		goto free_func_names;
-	prong_priv->num_cursors = DEFAULT_NUM_CURSORS;
+	prong_priv->num_cursors = num_funcs;
 
 free_func_names:
 	free(prong_priv->func_names);
@@ -97,12 +123,11 @@ void prong_free_priv(struct prong_priv *prong_priv)
 void process_tu_array(CXTranslationUnit *tu_array, int length, void *client_data) 
 {
 	for (int i = 0; i < length; ++i) {
-		CXCursor cursor = clang_getTranslationUnitCursor(tu_array[i]); // Obtain cursor at root of translation unit
+		CXCursor cursor = clang_getTranslationUnitCursor(tu_array[i]); 
 
-		int root_kind = clang_getCursorKind(cursor);
-		printf("Root cursor kind: %d\n", root_kind);
-
-		clang_visitChildren(cursor, prong_visitor, client_data);
+		/* Find our desired function declaration cursors and push them to
+		 * our cursor list inside of client_data */
+		clang_visitChildren(cursor, prong_visitor_match_func, client_data);
 	}
 
 }
@@ -127,6 +152,8 @@ void process_args(int argc, char **argv,
 				return;
 			else
 				*funcs_idx = i+1;
+		} else if (strcmp(cmd_arg, "--verbose") == 0) {
+			arg_verbose = true;
 		} else {
 			continue;
 		}

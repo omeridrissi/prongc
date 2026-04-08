@@ -3,6 +3,8 @@
 #include <clang-c/Index.h>
 #include "core.h"
 
+bool arg_verbose = false;
+
 int main(int argc, char **argv) 
 {
 	struct prong_priv *client_data;
@@ -57,6 +59,12 @@ int main(int argc, char **argv)
 	}
 
 	process_tu_array(tu_array, num_files, client_data);
+
+	// Now there's a list of cursors in client_data->cursors
+	// Do not free tu arrays until we're done with this cursor array
+	for (int i = 0; i < client_data->num_cursors; ++i) {
+		
+	}
 
 free_tu_array:
 	free(tu_array);
