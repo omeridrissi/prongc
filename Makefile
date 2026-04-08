@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -I/usr/lib/llvm-21/include 
+CFLAGS = -Wall -Wextra -O3 -I/usr/lib/llvm-21/include 
 LDFLAGS = -L/usr/lib/llvm-21/lib -lclang
 
 SRC := $(wildcard *.c)
