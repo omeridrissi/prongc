@@ -2,28 +2,34 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <stdarg.h>
 #include <clang-c/Index.h>
+#include "types.h"
 
 #define DEFAULT_NUM_CURSORS 5
 
 extern bool arg_verbose;
-
-struct prong_priv {
-	char **func_names;
-	int num_funcs;
-	CXCursor *cursors;
-	int num_cursors;
-	int num_cursors_filled;
-};
+extern bool arg_help;
 
 CXTranslationUnit	*alloc_tu_array(int length);
 CXCursor		*alloc_cursor_array(int length);
-void			prong_push_cursor(struct prong_priv *prong_priv, CXCursor *cursor);
-void process_tu_array(CXTranslationUnit *tu_array, int length, void *client_data);
-struct prong_priv *prong_init_priv(char **argv, int funcs_pos, int num_funcs);
+void			prong_push_cursor(struct prong_priv *prong_priv, 
+					  CXCursor *cursor);
+void process_tu_array(CXTranslationUnit *tu_array, 
+		      int length, 
+		      struct prong_priv *client_data);
+void process_func_cursor(CXCursor func_cursor,
+			 struct prong_priv *prong_priv);
+struct prong_priv *prong_init_priv();
 void prong_free_priv(struct prong_priv *prong_priv);
 
-void process_args(int argc, char **argv, 
-		  int *files_pos, int *funcs_pos,
-		  int *num_files, int *num_funcs);
-void print_usage(void);
+error_t process_args(int argc, char **argv, 
+		     struct prong_priv *prong_priv);
+
+void print_usage(const char *prog_name);
+
+void print_verbose(const char *format, ...);
+void print_debug(const char *format, ...);
+void print_error(const char *format, ...);
