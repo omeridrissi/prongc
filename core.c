@@ -48,7 +48,10 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 				return CXChildVisit_Continue;
 			}
 		}
-	} else if (current_cursor_kind == CXCursor_VarDecl) { // Collects global variable USRs
+	}
+
+	/* Collects global variable USRs */
+	if (current_cursor_kind == CXCursor_VarDecl) { 
 		enum CXLinkageKind current_cursor_linkage = 
 			clang_getCursorLinkage(current_cursor);
 		
@@ -62,8 +65,6 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 
 			clang_disposeString(cursor_usr);
 		}
-	} else {
-
 	}
 
 	clang_disposeString(parent_display_name);
@@ -99,9 +100,18 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 
 		clang_disposeString(current_cursor_usr);
 
-	} else if (current_cursor_kind == CXCursor_FunctionDecl) {
-		process_func_cursor(current_cursor, client_data);
-	} else {}
+	} 
+
+	if (current_cursor_kind == CXCursor_CallExpr) {
+		CXCursor callee_decl = clang_getCursorReferenced(current_cursor);
+
+		if (!clang_Cursor_isNull(callee_decl)) {
+			CXCursor callee_def = clang_getCursorDefinition(callee_decl);
+			if (!clang_Cursor_isNull(callee_def)) {
+				process_func_cursor(current_cursor, client_data);
+			}
+		}
+	}
 
 	return CXChildVisit_Continue;
 }
