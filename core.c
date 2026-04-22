@@ -1,5 +1,6 @@
 #include "core.h"
 #include "dyn_aos.h"
+#include "func_info.h"
 
 /* Visitor function for matching our specified 
  * function in args to our desired function 
@@ -158,7 +159,7 @@ void prong_push_cursor(struct prong_priv *prong_priv, CXCursor *cursor)
 	}
 }
 
-/* Initiates the state we're going to be
+/* Initializes the state we're going to be
  * working with. Zeroes it out, but then allocates
  * and sets the dynamic string arrays corresponding
  * to our global and local USRs */
@@ -173,7 +174,10 @@ struct prong_priv *prong_init_priv()
 	memset(prong_priv, '\0', sizeof(struct prong_priv));
 
 	prong_priv->global_usrs = init_aos();
-	prong_priv->local_usrs = init_aos();
+
+	prong_priv->funcs = init_func_info_array(FUNC_INFO_INIT_CAP);
+	prong_priv->current_func = init_func_info(NULL, NULL);
+	prong_priv->func_capacity = FUNC_INFO_INIT_CAP;
 
 	return prong_priv;
 
@@ -184,11 +188,11 @@ exit:
 /* Frees state (prong_priv) and it's allocated fields */
 void prong_free_priv(struct prong_priv *prong_priv) 
 {
-	char *string_copy_ptr = prong_priv->func_names[0];
+	char *string_copy_ptr = *prong_priv->func_names;
 	if (string_copy_ptr)
 		free(string_copy_ptr);
 
-	string_copy_ptr = prong_priv->file_names[0];
+	string_copy_ptr = *prong_priv->file_names;
 	if (string_copy_ptr)
 		free(string_copy_ptr);
 
@@ -200,8 +204,13 @@ void prong_free_priv(struct prong_priv *prong_priv)
 	if (prong_priv->global_usrs)
 		free_aos(prong_priv->global_usrs);
 
-	if (prong_priv->local_usrs)
-		free_aos(prong_priv->local_usrs);
+	if (prong_priv->funcs) {
+		for (size_t i = 0; i < prong_priv->func_count; ++i) {
+			free_func_info(prong_priv->funcs[i]);
+		}
+
+		free(prong_priv->funcs);
+	}
 
 	if (prong_priv)
 		free(prong_priv);
@@ -242,8 +251,7 @@ void process_func_cursor(CXCursor func_cursor,
  * every file name in that string */
 static char **split_args_comma(char *str_in, int *num_strs) {
 	int str_in_len = strlen(str_in);
-	char *str_in_cpy = (char*)malloc(sizeof(char)*str_in_len);
-	strcpy(str_in_cpy, str_in);
+	char *str_in_cpy = strdup(str_in);
 
 	char *token;
 	char *saveptr;
