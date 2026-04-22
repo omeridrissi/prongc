@@ -7,6 +7,6 @@
 
 #define FUNC_INFO_INIT_CAP 8
 
-FuncInfo *init_func_info(void);
+FuncInfo *init_func_info(char *usr, char *elem_name);
 void free_func_info(FuncInfo *func_info);
 FuncInfo **init_func_info_array(size_t initial_cap);
