@@ -250,7 +250,6 @@ void process_func_cursor(CXCursor func_cursor,
  * Then returns an array of pointers, each element pointing to 
  * every file name in that string */
 static char **split_args_comma(char *str_in, int *num_strs) {
-	int str_in_len = strlen(str_in);
 	char *str_in_cpy = strdup(str_in);
 
 	char *token;
