@@ -19,7 +19,8 @@ typedef enum {
 
 /* This struct will represent the functions we
  * recursively process over time */
-typedef struct {
+typedef struct FuncInfo FuncInfo;
+struct FuncInfo {
 	CXCursor	cursor;	// The FunctionDecl itself
 	char		*usr;	// USR of current function
 	char		*name;	// Name of the element, for debug info
@@ -33,7 +34,7 @@ typedef struct {
 	} deps;
 
 	bool processed;		// Have we visited it's body yet?
-} FuncInfo;
+};
 
 /* The prong_priv struct will hold the program
  * state and contain various types of data that
