@@ -15,13 +15,15 @@ extern bool arg_help;
 
 CXTranslationUnit	*alloc_tu_array(int length);
 CXCursor		*alloc_cursor_array(int length);
-void			prong_push_cursor(struct prong_priv *prong_priv, 
-					  CXCursor *cursor);
+
 void process_tu_array(CXTranslationUnit *tu_array, 
 		      int length, 
 		      struct prong_priv *client_data);
 void process_func_cursor(CXCursor func_cursor,
 			 struct prong_priv *prong_priv);
+void process_func_info(FuncInfo *func_info,
+			struct prong_priv *client_data);
+
 struct prong_priv *prong_init_priv();
 void prong_free_priv(struct prong_priv *prong_priv);
 

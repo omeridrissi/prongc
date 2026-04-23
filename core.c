@@ -31,22 +31,29 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 				     prong_priv->func_names[i], 
 				     elem_name_len-2) == 0
 			     )) {
+				CXString cursor_usr = clang_getCursorUSR(parent_cursor);
+
 				if (arg_verbose) {
 					print_verbose("Visiting element %s\n", 
 						      clang_getCString(parent_display_name));
 					print_verbose("	kind: %d\n", 
 						      clang_getCursorKind(parent_cursor));
-
-					CXString cursor_usr = clang_getCursorUSR(parent_cursor);
 					print_verbose("	unified symbol representation: %s\n", 
 						      clang_getCString(cursor_usr));
 
-					clang_disposeString(cursor_usr);
 				}
 				
-				prong_push_cursor(prong_priv, &parent_cursor);
+				FuncInfo *func_info = 
+					init_func_info(&parent_cursor,
+							clang_getCString(cursor_usr),
+							clang_getCString(parent_display_name));
 
-				return CXChildVisit_Continue;
+				push_func_info(&prong_priv->funcs,
+						&prong_priv->func_count,
+						&prong_priv->func_capacity,
+						func_info);
+				
+				clang_disposeString(cursor_usr);
 			}
 		}
 	}
@@ -69,11 +76,8 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	}
 
 	clang_disposeString(parent_display_name);
-	
-	if (prong_priv->num_cursors_filled != prong_priv->num_funcs)
-		prong_priv->err = ERR_NOT_FOUND;
 
-	return CXChildVisit_Recurse;
+	return CXChildVisit_Continue;
 }
 
 /* Visitor function for looping through 
@@ -91,25 +95,62 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 
 	/* If this is true, we have ourselves a
 	 * local variable declaration */
-	if ((current_cursor_kind == CXCursor_VarDecl || 
-	     current_cursor_kind == CXCursor_ParmDecl) && 
+	if (current_cursor_kind == CXCursor_VarDecl &&
 	    current_cursor_linkage == CXLinkage_NoLinkage) {
 		CXString current_cursor_usr = clang_getCursorUSR(current_cursor);
 
 		const char *current_usr_string = clang_getCString(current_cursor_usr);
-		aos_push_string(prong_priv->local_usrs, current_usr_string);
+		aos_push_string(prong_priv->current_func->locals, current_usr_string);
 
 		clang_disposeString(current_cursor_usr);
 
-	} 
+	}
+	
+	/* If this is true, we have ourselves a
+	 * parameter declaration */
+	if (current_cursor_kind == CXCursor_ParmDecl && 
+	    current_cursor_linkage == CXLinkage_NoLinkage) {
+		CXString current_cursor_usr = clang_getCursorUSR(current_cursor);
 
+		const char *current_usr_string = clang_getCString(current_cursor_usr);
+		aos_push_string(prong_priv->current_func->params, current_usr_string);
+
+		clang_disposeString(current_cursor_usr);
+
+	}
+
+	/* If we have a function call, push that function's
+	 * definition onto the list of callees in our current
+	 * FuncInfo struct, then recursively process that 
+	 * function */
 	if (current_cursor_kind == CXCursor_CallExpr) {
 		CXCursor callee_decl = clang_getCursorReferenced(current_cursor);
 
 		if (!clang_Cursor_isNull(callee_decl)) {
 			CXCursor callee_def = clang_getCursorDefinition(callee_decl);
 			if (!clang_Cursor_isNull(callee_def)) {
-				process_func_cursor(current_cursor, client_data);
+				CXString callee_usr = clang_getCursorUSR(callee_def);
+				CXString callee_name = clang_getCursorDisplayName(callee_def);
+
+				FuncInfo *callee_func_info = 
+					init_func_info(&callee_def,
+						       clang_getCString(callee_usr),
+						       clang_getCString(callee_name));
+
+				clang_disposeString(callee_usr);
+				clang_disposeString(callee_name);
+				
+				if (!prong_priv->current_func->deps.callees)
+					prong_priv->current_func->deps.callees = 
+						init_func_info_array(FUNC_INFO_INIT_CAP);
+
+				push_func_info(
+					&prong_priv->current_func->deps.callees,
+					&prong_priv->current_func->deps.callee_count,
+					&prong_priv->current_func->deps.callee_capacity,
+					callee_func_info);
+
+				process_func_info(callee_func_info, client_data);
 			}
 		}
 	}
@@ -148,17 +189,6 @@ bool cursor_empty(CXCursor *cursor)
 		return true;
 }
 
-/* Pushes a cursor to the cursor array in our 
- * state struct */
-void prong_push_cursor(struct prong_priv *prong_priv, CXCursor *cursor)
-{
-	if (prong_priv->num_cursors_filled < prong_priv->num_cursors) {
-		memcpy((prong_priv->cursors+prong_priv->num_cursors_filled), 
-				cursor, sizeof(CXCursor));
-		prong_priv->num_cursors_filled++;
-	}
-}
-
 /* Initializes the state we're going to be
  * working with. Zeroes it out, but then allocates
  * and sets the dynamic string arrays corresponding
@@ -176,7 +206,7 @@ struct prong_priv *prong_init_priv()
 	prong_priv->global_usrs = init_aos();
 
 	prong_priv->funcs = init_func_info_array(FUNC_INFO_INIT_CAP);
-	prong_priv->current_func = init_func_info(NULL, NULL);
+	prong_priv->current_func = init_func_info(NULL, NULL, NULL);
 	prong_priv->func_capacity = FUNC_INFO_INIT_CAP;
 
 	return prong_priv;
@@ -242,6 +272,16 @@ void process_func_cursor(CXCursor func_cursor,
 			    (void*)client_data);
 }
 
+void process_func_info(FuncInfo *func_info,
+			struct prong_priv *client_data)
+{
+	client_data->current_func = func_info;
+	
+	clang_visitChildren(func_info->cursor,
+			    prong_visitor_walk_func,
+			    (void*)client_data);
+}
+
 #define MAX_NUM_SPLIT_STRS 24
 
 /* Allocates a copy of the string containing our file names
@@ -297,8 +337,6 @@ error_t process_args(int argc, char **argv,
 								   &num_strs);
 			prong_priv->func_names = split_func_names;
 			prong_priv->num_funcs = num_strs;
-
-			prong_priv->num_cursors = num_strs;
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {

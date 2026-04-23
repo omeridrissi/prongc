@@ -20,6 +20,9 @@ typedef enum {
 /* This struct will represent the functions we
  * recursively process over time */
 typedef struct FuncInfo FuncInfo;
+typedef FuncInfo** FuncInfoArr;
+typedef FuncInfo*** FuncInfoArrPtr;
+
 struct FuncInfo {
 	CXCursor	cursor;	// The FunctionDecl itself
 	char		*usr;	// USR of current function
@@ -28,7 +31,7 @@ struct FuncInfo {
 	DynamicAOS	*locals;// USRs for local VarDecls
 	/* For dependency tracking */
 	struct {
-		FuncInfo	**callees; // Functions this one calls
+		FuncInfoArr	callees; // Functions this one calls
 		size_t		callee_count; // 
 		size_t		callee_capacity;
 	} deps;
@@ -44,12 +47,9 @@ struct prong_priv {
 	char		**file_names;	// The file names we get from cmdline
 	int		num_funcs;	// Number of functions
 	int		num_files;	// Number of files
-	CXCursor	*cursors;	// Cursor array (collected FuncDecl matches)
-	int		num_cursors;	// Allocated cursor array capacity
-	int		num_cursors_filled; // Cursor array size
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
 	/* Function declaration registry */
-	FuncInfo	**funcs;
+	FuncInfoArr	funcs;
 	size_t		func_count;
 	size_t		func_capacity;
 	FuncInfo	*current_func; // Current traversal state
