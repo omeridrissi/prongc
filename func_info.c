@@ -1,5 +1,6 @@
 #include "func_info.h"
 #include "dyn_aos.h"
+#include "core.h"
 
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
@@ -46,7 +47,19 @@ void push_func_info(FuncInfoArrPtr func_info_array,
 						*fi_array_capacity,
 						sizeof(FuncInfo*));
 	}
-	
+
+	if (arg_verbose) {
+		print_verbose("Pushing function info struct:\n");
+		print_verbose(" USR: %s\n", func_info->usr);
+		print_verbose(" display name: %s\n", func_info->name);
+		print_verbose(" parameters: ");
+		aos_print_strings(func_info->params);
+		printf("\n");
+		print_verbose(" local vars: ");
+		aos_print_strings(func_info->locals);
+		printf("\n");
+	}
+
 	*func_info_array[++*fi_array_count] = func_info;
 }
 

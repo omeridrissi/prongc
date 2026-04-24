@@ -8,6 +8,9 @@
 
 #define FUNC_INFO_INIT_CAP 8
 
+extern bool arg_verbose;
+extern bool arg_help;
+
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
 			 const char *elem_name);
