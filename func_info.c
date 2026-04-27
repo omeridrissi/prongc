@@ -17,7 +17,7 @@ FuncInfo *init_func_info(CXCursor *cursor,
 		func_info->name = strdup(elem_name);
 
 	if (cursor != NULL) {
-		memcpy(&func_info->cursor, cursor, sizeof(CXCursor));
+		func_info->cursor = cursor;
 	}
 
 	func_info->params = init_aos();
@@ -36,39 +36,64 @@ void free_func_info(FuncInfo *func_info)
 	free(func_info);
 }
 
-void push_func_info(FuncInfoArrPtr func_info_array,
-		    size_t *fi_array_count,
-		    size_t *fi_array_capacity,
-		    FuncInfo *func_info)
+void push_func_info(FuncInfoArr *func_info_array,
+		    CXCursor *cursor, const char *usr,
+		    const char *elem_name)
 {
-	if (*fi_array_count+1 > *fi_array_capacity) {
-		*fi_array_capacity *= 2;
-		*func_info_array = reallocarray(*func_info_array,
-						*fi_array_capacity,
+	FuncInfo *func_info = init_func_info(cursor,
+					     usr,
+					     elem_name);
+
+	if (func_info_array->size+sizeof(FuncInfo) > func_info_array->capacity) {
+		func_info_array->capacity *= 1.5f;
+		func_info_array->data = reallocarray(func_info_array->data,
+						func_info_array->capacity,
 						sizeof(FuncInfo*));
 	}
 
-	if (arg_verbose) {
-		print_verbose("Pushing function info struct:\n");
-		print_verbose(" USR: %s\n", func_info->usr);
-		print_verbose(" display name: %s\n", func_info->name);
-		print_verbose(" parameters: ");
-		aos_print_strings(func_info->params);
-		printf("\n");
-		print_verbose(" local vars: ");
-		aos_print_strings(func_info->locals);
-		printf("\n");
-	}
+	printf("Pushing function info struct:\n");
+	printf(" USR: %s\n", func_info->usr);
+	printf(" display name: %s\n", func_info->name);
+	printf(" parameters: ");
+	aos_print_strings(func_info->params);
+	printf("\n");
+	printf(" local vars: ");
+	aos_print_strings(func_info->locals);
+	printf("\n");
 
-	*func_info_array[++*fi_array_count] = func_info;
+	func_info_array->size += sizeof(FuncInfo);
+	memcpy(func_info_array->data+func_info_array->size,
+			func_info, sizeof(*func_info));
+
+	free(func_info);
 }
 
-FuncInfo **init_func_info_array(size_t initial_cap)
+FuncInfo *func_info_array_head(FuncInfoArr *func_info_array)
 {
-	FuncInfo **array;
-	array = malloc(sizeof(*array)*initial_cap);
+	return &func_info_array->data[0];
+}
 
-	memset(array, '\0', sizeof(*array)*initial_cap);
+FuncInfo *func_info_array_tail(FuncInfoArr *func_info_array)
+{
+	size_t tail_idx = func_info_array->size-1;
+	return &func_info_array->data[tail_idx];
+}
 
-	return array;
+FuncInfoArr *init_func_info_array()
+{
+	
+	FuncInfoArr *func_info_array;
+	func_info_array = malloc(sizeof(*func_info_array));
+
+	func_info_array->capacity = FUNC_INFO_INIT_CAP;
+	func_info_array->size = 0;
+	func_info_array->data = malloc(sizeof(FuncInfo)*FUNC_INFO_INIT_CAP);
+
+	return func_info_array;
+}
+
+void free_func_info_array(FuncInfoArr *func_info_array)
+{
+	free(func_info_array->data);
+	free(func_info_array);
 }

@@ -17,24 +17,26 @@ typedef enum {
 	ERR_IO
 } error_t;
 
+/* Forward declaration */
+typedef struct FuncInfo FuncInfo;
+
+typedef struct {
+	size_t capacity;
+	size_t size;
+	FuncInfo *data;
+} FuncInfoArr;
+
 /* This struct will represent the functions we
  * recursively process over time */
-typedef struct FuncInfo FuncInfo;
-typedef FuncInfo** FuncInfoArr;
-typedef FuncInfo*** FuncInfoArrPtr;
-
 struct FuncInfo {
-	CXCursor	cursor;	// The FunctionDecl itself
+	CXCursor	*cursor;	// The FunctionDecl itself
 	char		*usr;	// USR of current function
 	char		*name;	// Name of the element, for debug info
 	DynamicAOS	*params;// USRs of parameters
 	DynamicAOS	*locals;// USRs for local VarDecls
+	
 	/* For dependency tracking */
-	struct {
-		FuncInfoArr	callees; // Functions this one calls
-		size_t		callee_count; // 
-		size_t		callee_capacity;
-	} deps;
+	FuncInfoArr	*callees;
 
 	bool processed;		// Have we visited it's body yet?
 };
@@ -45,13 +47,11 @@ struct FuncInfo {
 struct prong_priv {
 	char		**func_names;	// The func names we get from cmdline
 	char		**file_names;	// The file names we get from cmdline
-	int		num_funcs;	// Number of functions
+	int		num_funcs;	// Number of function names
 	int		num_files;	// Number of files
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
-	/* Function declaration registry */
-	FuncInfoArr	funcs;
-	size_t		func_count;
-	size_t		func_capacity;
+	/* Function registry declaration */
+	FuncInfoArr	*funcs;
 	FuncInfo	*current_func; // Current traversal state
 	/* Visitor function error return */
 	error_t		err;		

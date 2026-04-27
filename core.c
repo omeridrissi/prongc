@@ -27,10 +27,9 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 
 			/* Match a specific function body definition */
 			if ((func_name_len == elem_name_len-2) &&
-			    (strncmp(elem_name, 
-				     prong_priv->func_names[i], 
-				     elem_name_len-2) == 0
-			     )) {
+				(strncmp(elem_name, 
+					prong_priv->func_names[i],
+					elem_name_len-2) == 0)) {
 				CXString cursor_usr = clang_getCursorUSR(parent_cursor);
 
 				if (arg_verbose) {
@@ -43,19 +42,15 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 
 				}
 				
-				FuncInfo *func_info = 
-					init_func_info(&parent_cursor,
-							clang_getCString(cursor_usr),
-							clang_getCString(parent_display_name));
-
-				push_func_info(&prong_priv->funcs,
-						&prong_priv->func_count,
-						&prong_priv->func_capacity,
-						func_info);
+				push_func_info(prong_priv->funcs,
+						&parent_cursor,
+						clang_getCString(cursor_usr),
+						clang_getCString(parent_display_name));
 				
 				clang_disposeString(cursor_usr);
 			}
 		}
+		return CXChildVisit_Continue;
 	}
 
 	/* Collects global variable USRs */
@@ -73,11 +68,13 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 
 			clang_disposeString(cursor_usr);
 		}
+
+		return CXChildVisit_Continue;
 	}
 
 	clang_disposeString(parent_display_name);
 
-	return CXChildVisit_Continue;
+	return CXChildVisit_Recurse;
 }
 
 /* Visitor function for looping through 
@@ -131,26 +128,25 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			if (!clang_Cursor_isNull(callee_def)) {
 				CXString callee_usr = clang_getCursorUSR(callee_def);
 				CXString callee_name = clang_getCursorDisplayName(callee_def);
-
-				FuncInfo *callee_func_info = 
-					init_func_info(&callee_def,
-						       clang_getCString(callee_usr),
-						       clang_getCString(callee_name));
-
-				clang_disposeString(callee_usr);
-				clang_disposeString(callee_name);
-				
-				if (!prong_priv->current_func->deps.callees)
-					prong_priv->current_func->deps.callees = 
-						init_func_info_array(FUNC_INFO_INIT_CAP);
+			
+				// Checks if callee array is initialized
+				if (!prong_priv->current_func->callees)
+					prong_priv->current_func->callees = 
+						init_func_info_array();
 
 				push_func_info(
-					&prong_priv->current_func->deps.callees,
-					&prong_priv->current_func->deps.callee_count,
-					&prong_priv->current_func->deps.callee_capacity,
-					callee_func_info);
+					prong_priv->current_func->callees,
+					&callee_def,
+					clang_getCString(callee_usr),
+					clang_getCString(callee_name));
+				
+				clang_disposeString(callee_usr);
+				clang_disposeString(callee_name);
 
-				process_func_info(callee_func_info, client_data);
+				process_func_info(func_info_array_tail(
+							prong_priv->current_func->callees
+						  ),
+						  client_data);
 			}
 		}
 	}
@@ -165,15 +161,6 @@ CXTranslationUnit *alloc_tu_array(int length)
 	tus = (CXTranslationUnit*)malloc(sizeof(CXTranslationUnit) * length);
 
 	return tus;
-}
-
-/* Allocates an array of cursors */
-CXCursor *alloc_cursor_array(int length)
-{
-	CXCursor *cursors;
-	cursors = (CXCursor*)malloc(sizeof(CXCursor) * length);
-
-	return cursors;
 }
 
 /* Checks if a cursor struct is uninitialized */
@@ -205,9 +192,7 @@ struct prong_priv *prong_init_priv()
 
 	prong_priv->global_usrs = init_aos();
 
-	prong_priv->funcs = init_func_info_array(FUNC_INFO_INIT_CAP);
-	prong_priv->current_func = init_func_info(NULL, NULL, NULL);
-	prong_priv->func_capacity = FUNC_INFO_INIT_CAP;
+	prong_priv->funcs = init_func_info_array();
 
 	return prong_priv;
 
@@ -235,15 +220,12 @@ void prong_free_priv(struct prong_priv *prong_priv)
 		free_aos(prong_priv->global_usrs);
 
 	if (prong_priv->funcs) {
-		for (size_t i = 0; i < prong_priv->func_count; ++i) {
-			free_func_info(prong_priv->funcs[i]);
-		}
-
-		free(prong_priv->funcs);
+		free_func_info_array(prong_priv->funcs);
 	}
-
+	
 	if (prong_priv)
 		free(prong_priv);
+	
 }
 
 /* Gets root cursor and visit it's children with
@@ -264,20 +246,12 @@ void process_tu_array(CXTranslationUnit *tu_array,
 
 }
 
-void process_func_cursor(CXCursor func_cursor,
-			  struct prong_priv *client_data)
-{
-	clang_visitChildren(func_cursor, 
-			    prong_visitor_walk_func, 
-			    (void*)client_data);
-}
-
 void process_func_info(FuncInfo *func_info,
 			struct prong_priv *client_data)
 {
 	client_data->current_func = func_info;
 	
-	clang_visitChildren(func_info->cursor,
+	clang_visitChildren(*func_info->cursor,
 			    prong_visitor_walk_func,
 			    (void*)client_data);
 }
