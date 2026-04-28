@@ -18,5 +18,6 @@ ssize_t		aos_string_count(DynamicAOS *array);
 bool		aos_contains_string(DynamicAOS *array, const char *needle);
 ssize_t		aos_find_string_idx(DynamicAOS *array, const char *needle);
 char		*aos_find_string(DynamicAOS *array, const char *needle);
+char		*aos_string_at(DynamicAOS *array, size_t idx);
 
 void		aos_print_strings(DynamicAOS *array);

@@ -44,28 +44,31 @@ void push_func_info(FuncInfoArr *func_info_array,
 					     usr,
 					     elem_name);
 
-	if (func_info_array->size+sizeof(FuncInfo) > func_info_array->capacity) {
-		func_info_array->capacity *= 1.5f;
+	if ((func_info_array->size+1)*sizeof(FuncInfo) > func_info_array->capacity) {
+		func_info_array->capacity *= 2;
 		func_info_array->data = reallocarray(func_info_array->data,
 						func_info_array->capacity,
-						sizeof(FuncInfo*));
+						sizeof(FuncInfo));
 	}
 
-	printf("Pushing function info struct:\n");
-	printf(" USR: %s\n", func_info->usr);
-	printf(" display name: %s\n", func_info->name);
-	printf(" parameters: ");
-	aos_print_strings(func_info->params);
-	printf("\n");
-	printf(" local vars: ");
-	aos_print_strings(func_info->locals);
-	printf("\n");
-
-	func_info_array->size += sizeof(FuncInfo);
+	func_info_array->size++;
 	memcpy(func_info_array->data+func_info_array->size,
-			func_info, sizeof(*func_info));
+			func_info, sizeof(FuncInfo));
 
 	free(func_info);
+}
+	
+void print_func_info(FuncInfo *func_info, int indentation)
+{
+	printf("%*sPushing function info struct:\n", indentation, "");
+	printf("%*s|_ USR: %s\n", indentation+1, "", func_info->usr);
+	printf("%*s|_ display name: %s\n", indentation+1, "", func_info->name);
+	printf("%*s|_ parameters: ", indentation+1, "");
+	aos_print_strings(func_info->params);
+	printf("\n");
+	printf("%*s|_ local vars: ", indentation+1, "");
+	aos_print_strings(func_info->locals);
+	printf("\n");
 }
 
 FuncInfo *func_info_array_head(FuncInfoArr *func_info_array)

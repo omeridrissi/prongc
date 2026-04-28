@@ -46,8 +46,8 @@ error_t aos_push_string(DynamicAOS *array, const char *str)
 bounds_check:
 	if ((array->size + str_size) > array->capacity) {
 		array->data = reallocarray(array->data, 
-					   sizeof(char)*2, 
-					   array->capacity);
+					   array->capacity, 
+					   sizeof(char)*2);
 		if (!array->data)
 			return ERR_OUT_OF_MEMORY;
 		array->capacity = array->capacity*2;
@@ -56,6 +56,7 @@ bounds_check:
 
 	memcpy(array->data + array->size, str, str_size);
 	array->size += str_size;
+	array->count++;
 
 	return 0;
 }
@@ -64,16 +65,7 @@ bounds_check:
  * in the memory block */
 ssize_t aos_string_count(DynamicAOS *array)
 {
-	int num_strs = 0;
-
-	size_t offset = 0;
-	while (offset <= array->size) {
-		const char *current = array->data + offset;
-		++num_strs;
-		offset += strlen(current)+1;
-	}
-
-	return num_strs;
+	return array->count;
 }
 
 /* Returns the string's memory location if
@@ -127,17 +119,39 @@ ssize_t aos_find_string_idx(DynamicAOS *array, const char *needle)
 	return -1;
 }
 
+/* Returns the beginning of the string at 
+ * certain idx in order, returns NULL if 
+ * index is out of range. */
+char *aos_string_at(DynamicAOS *array, size_t idx) 
+{
+	size_t counter = 0;
+	size_t offset = 0;
+	while (offset <= array->size) {
+		const char *current = array->data + offset;
+		if (counter++ == idx)
+			return current;
+		offset += strlen(current)+1;
+	}
+
+	return NULL;
+}
+
 /* Prints all the strings in the array */
 void aos_print_strings(DynamicAOS *array) 
 {
+	if (array->count == 0) {
+		printf("[ empty ]");
+		return;
+	}
 	printf("[ ");
+	size_t n = array->count;
 	size_t offset = 0;
-	while (offset <= array->size) {
+	for (size_t i = 0; i < n; ++i) {
 		const char *current = array->data + offset;
 		printf("\"");
 		printf("%s", current);
 		printf("\", ");
-
+		
 		offset += strlen(current)+1;
 	}
 	printf("]");

@@ -21,34 +21,25 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	/* Collects function declaration cursors */
 	if ((current_cursor_kind == CXCursor_CompoundStmt) &&
 	    (parent_cursor_kind == CXCursor_FunctionDecl)) {
-		for (int i = 0; i < prong_priv->num_funcs; ++i) {
-			int func_name_len = strlen(prong_priv->func_names[i]);
-			int elem_name_len = strlen(elem_name);
+		
+		if (aos_contains_string(prong_priv->func_names, elem_name)) {
+			CXString cursor_usr = clang_getCursorUSR(parent_cursor);
+			if (arg_verbose) {
+				print_verbose("Visiting element %s\n", 
+					      clang_getCString(parent_display_name));
+				print_verbose("	kind: %d\n", 
+					      clang_getCursorKind(parent_cursor));
+				print_verbose("	unified symbol representation: %s\n", 
+					      clang_getCString(cursor_usr));
 
-			/* Match a specific function body definition */
-			if ((func_name_len == elem_name_len-2) &&
-				(strncmp(elem_name, 
-					prong_priv->func_names[i],
-					elem_name_len-2) == 0)) {
-				CXString cursor_usr = clang_getCursorUSR(parent_cursor);
-
-				if (arg_verbose) {
-					print_verbose("Visiting element %s\n", 
-						      clang_getCString(parent_display_name));
-					print_verbose("	kind: %d\n", 
-						      clang_getCursorKind(parent_cursor));
-					print_verbose("	unified symbol representation: %s\n", 
-						      clang_getCString(cursor_usr));
-
-				}
-				
-				push_func_info(prong_priv->funcs,
-						&parent_cursor,
-						clang_getCString(cursor_usr),
-						clang_getCString(parent_display_name));
-				
-				clang_disposeString(cursor_usr);
 			}
+			
+			push_func_info(prong_priv->funcs,
+					&parent_cursor,
+					clang_getCString(cursor_usr),
+					clang_getCString(parent_display_name));
+			
+			clang_disposeString(cursor_usr);
 		}
 		return CXChildVisit_Continue;
 	}
@@ -86,6 +77,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						CXClientData client_data)
 {
 	struct prong_priv *prong_priv = (struct prong_priv*)client_data;
+
+	prong_priv->recursion_depth++;
 
 	enum CXCursorKind current_cursor_kind = clang_getCursorKind(current_cursor);
 	enum CXLinkageKind current_cursor_linkage = clang_getCursorLinkage(current_cursor);
@@ -151,6 +144,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		}
 	}
 
+	prong_priv->recursion_depth--;
+
 	return CXChildVisit_Continue;
 }
 
@@ -190,6 +185,9 @@ struct prong_priv *prong_init_priv()
 
 	memset(prong_priv, '\0', sizeof(struct prong_priv));
 
+	prong_priv->func_names = init_aos();
+	prong_priv->file_names = init_aos();
+
 	prong_priv->global_usrs = init_aos();
 
 	prong_priv->funcs = init_func_info_array();
@@ -203,18 +201,10 @@ exit:
 /* Frees state (prong_priv) and it's allocated fields */
 void prong_free_priv(struct prong_priv *prong_priv) 
 {
-	char *string_copy_ptr = *prong_priv->func_names;
-	if (string_copy_ptr)
-		free(string_copy_ptr);
-
-	string_copy_ptr = *prong_priv->file_names;
-	if (string_copy_ptr)
-		free(string_copy_ptr);
-
 	if (prong_priv->func_names)
-		free(prong_priv->func_names);
+		free_aos(prong_priv->func_names);
 	if (prong_priv->file_names)
-		free(prong_priv->file_names);
+		free_aos(prong_priv->file_names);
 
 	if (prong_priv->global_usrs)
 		free_aos(prong_priv->global_usrs);
@@ -231,10 +221,9 @@ void prong_free_priv(struct prong_priv *prong_priv)
 /* Gets root cursor and visit it's children with
  * prong_visitor_walk_ast() function*/
 void process_tu_array(CXTranslationUnit *tu_array, 
-		      int length, 
 		      struct prong_priv *client_data) 
 {
-	for (int i = 0; i < length; ++i) {
+	for (size_t i = 0; i < client_data->file_names->count; ++i) {
 		CXCursor cursor = clang_getTranslationUnitCursor(tu_array[i]); 
 
 		/* Find our desired function declaration cursors and push them to
@@ -256,33 +245,26 @@ void process_func_info(FuncInfo *func_info,
 			    (void*)client_data);
 }
 
-#define MAX_NUM_SPLIT_STRS 24
-
-/* Allocates a copy of the string containing our file names
- * that are comma separated and replaces the commas with null
- * characters, forming a tightly packed array of C strings.
- * Then returns an array of pointers, each element pointing to 
- * every file name in that string */
-static char **split_args_comma(char *str_in, int *num_strs) {
-	char *str_in_cpy = strdup(str_in);
-
-	char *token;
-	char *saveptr;
-
-	char **result = (char**)malloc(sizeof(char*)*MAX_NUM_SPLIT_STRS);
-
-	token = strtok_r(str_in_cpy, ",", &saveptr);
-
-	*num_strs = 0;
-	while (token != NULL) {
-		result[*num_strs] = token;
-		token = strtok_r(NULL, ",", &saveptr);
-		*num_strs += 1;
-		if (*num_strs > MAX_NUM_SPLIT_STRS)
-			break;
+void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
+{
+	char *files_str_array = strdup(str_in);
+	char *temp = files_str_array;
+	size_t num_files = 1;
+	int offset = 0;
+	while (temp[offset] != '\0') {
+		if (temp[offset] == ',') {
+			temp[offset] = '\0';
+			num_files++;
+		}
+		++offset;
 	}
 
-	return result;
+	for (size_t n = 0; n < num_files; ++n) {
+		aos_push_string(dyn_aos, temp);
+		temp += strlen(temp)+1;
+	}
+
+	free(files_str_array);
 
 }
 
@@ -300,17 +282,9 @@ error_t process_args(int argc, char **argv,
 		cmd_arg	= argv[i];
 		
 		if (strncmp(cmd_arg, "--files=", FILES_ARG_STRLEN) == 0) {
-			int num_strs;
-			char **split_file_names = split_args_comma(cmd_arg+FILES_ARG_STRLEN, 
-								   &num_strs);
-			prong_priv->file_names = split_file_names;
-			prong_priv->num_files = num_strs;
+			split_comma_list(cmd_arg+FILES_ARG_STRLEN, prong_priv->file_names);
 		} else if (strncmp(cmd_arg, "--functions=", FUNCS_ARG_STRLEN) == 0) {
-			int num_strs;
-			char **split_func_names = split_args_comma(cmd_arg+FUNCS_ARG_STRLEN,
-								   &num_strs);
-			prong_priv->func_names = split_func_names;
-			prong_priv->num_funcs = num_strs;
+			split_comma_list(cmd_arg+FUNCS_ARG_STRLEN, prong_priv->func_names);
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {
@@ -320,8 +294,8 @@ error_t process_args(int argc, char **argv,
 		}
 	}
 
-	if (!prong_priv->file_names || !prong_priv->func_names ||
-		prong_priv->num_files == 0 || prong_priv->num_funcs == 0)
+	if (prong_priv->func_names->count == 0 ||
+		prong_priv->file_names->count == 0)
 		return ERR_INVALID_ARG;
 
 	return 0;

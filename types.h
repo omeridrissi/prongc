@@ -6,12 +6,14 @@
 typedef struct {
 	size_t capacity;
 	size_t size;
+	size_t count;
 	char *data;
 } DynamicAOS;
 
 typedef enum {
 	ERR_OK = 0,
 	ERR_NOT_FOUND,
+	ERR_TU,
 	ERR_INVALID_ARG,
 	ERR_OUT_OF_MEMORY,
 	ERR_IO
@@ -45,14 +47,17 @@ struct FuncInfo {
  * state and contain various types of data that
  * our program will collect and use over time */
 struct prong_priv {
-	char		**func_names;	// The func names we get from cmdline
-	char		**file_names;	// The file names we get from cmdline
-	int		num_funcs;	// Number of function names
-	int		num_files;	// Number of files
+	DynamicAOS	*func_names;	// The func names we get from cmdline
+	DynamicAOS	*file_names;	// The file names we get from cmdline
+	
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
+	
 	/* Function registry declaration */
 	FuncInfoArr	*funcs;
 	FuncInfo	*current_func; // Current traversal state
+	
+	size_t		recursion_depth; // Recursion depth for callees
+					 // (changes with each recursion)
 	/* Visitor function error return */
 	error_t		err;		
 };

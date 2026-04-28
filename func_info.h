@@ -24,5 +24,7 @@ void push_func_info(FuncInfoArr *func_info_array,
 FuncInfo *func_info_array_tail(FuncInfoArr *func_info_array);
 FuncInfo *func_info_array_head(FuncInfoArr *func_info_array);
 
+void print_func_info(FuncInfo *func_info, int indentation);
+
 FuncInfoArr *init_func_info_array();
 void free_func_info_array(FuncInfoArr *func_info_array);

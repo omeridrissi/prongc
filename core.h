@@ -16,7 +16,6 @@ extern bool arg_help;
 CXTranslationUnit	*alloc_tu_array(int length);
 
 void process_tu_array(CXTranslationUnit *tu_array, 
-		      int length, 
 		      struct prong_priv *client_data);
 void process_func_info(FuncInfo *func_info,
 			struct prong_priv *client_data);
