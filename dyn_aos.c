@@ -21,6 +21,7 @@ DynamicAOS *init_aos(void)
 	array_struct->data = (char*)malloc(sizeof(char)*AOS_INITIAL_CAP);
 	array_struct->capacity = AOS_INITIAL_CAP;
 	array_struct->size = 0;
+	array_struct->count = 0;
 
 	return array_struct;
 }
@@ -89,8 +90,8 @@ char *aos_find_string(DynamicAOS *array, const char *needle)
 bool aos_contains_string(DynamicAOS *array, const char *needle)
 {
 	size_t offset = 0;
-	while (offset <= array->size) {
-		const char *current = array->data + offset;
+	for (size_t i = 0; i < array->count; ++i) {
+		const char *current = array->data+offset;
 		if (strcmp(current, needle) == 0) {
 			return true;
 		}

@@ -17,7 +17,7 @@ FuncInfo *init_func_info(CXCursor *cursor,
 		func_info->name = strdup(elem_name);
 
 	if (cursor != NULL) {
-		func_info->cursor = cursor;
+		func_info->cursor = *cursor;
 	}
 
 	func_info->params = init_aos();
@@ -51,24 +51,41 @@ void push_func_info(FuncInfoArr *func_info_array,
 						sizeof(FuncInfo));
 	}
 
-	func_info_array->size++;
 	memcpy(func_info_array->data+func_info_array->size,
 			func_info, sizeof(FuncInfo));
+	func_info_array->size++;
 
 	free(func_info);
 }
 	
 void print_func_info(FuncInfo *func_info, int indentation)
 {
-	printf("%*sPushing function info struct:\n", indentation, "");
-	printf("%*s|_ USR: %s\n", indentation+1, "", func_info->usr);
-	printf("%*s|_ display name: %s\n", indentation+1, "", func_info->name);
-	printf("%*s|_ parameters: ", indentation+1, "");
+	int x = indentation*2;
+	printf("Func info \"%s\":\n", func_info->name);
+	printf("%*s|_ USR: %s\n", indentation+x, "", func_info->usr);
+	printf("%*s|_ parameters: ", indentation+x, "");
 	aos_print_strings(func_info->params);
 	printf("\n");
-	printf("%*s|_ local vars: ", indentation+1, "");
+	printf("%*s|_ local vars: ", indentation+x, "");
 	aos_print_strings(func_info->locals);
 	printf("\n");
+	if (func_info->callees) {
+		printf("%*s|_ has callees: true\n", indentation+x, "");
+		printf("%*s|_ ", indentation+x, "");
+	} else {
+		printf("%*s|_ has callees: false\n", indentation+x, "");
+	}
+}
+
+void print_func_info_array(FuncInfoArr *func_info_array, int depth)
+{
+	for (size_t i = 0; i < func_info_array->size; ++i) {
+		print_func_info(&func_info_array->data[i], depth);
+		if (func_info_array->data[i].callees) {
+			print_func_info_array(func_info_array->data[i].callees, 
+						depth+1);
+		}
+	}
 }
 
 FuncInfo *func_info_array_head(FuncInfoArr *func_info_array)

@@ -14,6 +14,7 @@ typedef enum {
 	ERR_OK = 0,
 	ERR_NOT_FOUND,
 	ERR_TU,
+	ERR_SYNTAX,
 	ERR_INVALID_ARG,
 	ERR_OUT_OF_MEMORY,
 	ERR_IO
@@ -31,7 +32,7 @@ typedef struct {
 /* This struct will represent the functions we
  * recursively process over time */
 struct FuncInfo {
-	CXCursor	*cursor;	// The FunctionDecl itself
+	CXCursor	cursor;	// The FunctionDecl cursor itself
 	char		*usr;	// USR of current function
 	char		*name;	// Name of the element, for debug info
 	DynamicAOS	*params;// USRs of parameters

@@ -39,15 +39,6 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
-	print_debug("Number of functio names = %d\n", client_data->func_names->count);
-	print_debug("Function names:	");
-	aos_print_strings(client_data->func_names);
-	printf("\n");
-	print_debug("Number of file names = %d\n", client_data->file_names->count);
-	print_debug("File names: \n");
-	aos_print_strings(client_data->file_names);
-	printf("\n");
-
 	CXIndex index = clang_createIndex(0, 0);
 
 	CXTranslationUnit *tu_array = alloc_tu_array(client_data->file_names->count);
@@ -63,30 +54,74 @@ int main(int argc, char **argv)
 			NULL, 0,
 			CXTranslationUnit_None
 		);
-
+		
 		if (!tu_array[i]) {
 			print_error("Unable to parse translation unit. Quitting.\n");
 			ret = ERR_TU; // it didn't find the file or whatever
 			goto free_tu_array;
 		}
+
+		size_t num_diagnostics = clang_getNumDiagnostics(tu_array[i]);
+		bool has_error = false;
+		
+		if (num_diagnostics == 0)
+			continue;
+
+		for (size_t j = 0; j < num_diagnostics; ++j) {
+			CXDiagnostic diag = clang_getDiagnostic(tu_array[i], j);
+			enum CXDiagnosticSeverity diag_severity = 
+					clang_getDiagnosticSeverity(diag);
+			CXString formatted;
+
+			switch (diag_severity) {
+				case CXDiagnostic_Error:
+				case CXDiagnostic_Fatal:
+					has_error = true;
+					formatted = clang_formatDiagnostic(diag, 
+							clang_defaultDiagnosticDisplayOptions());
+					print_error("Error: \n\t%s\n", clang_getCString(formatted));
+					clang_disposeString(formatted);
+					break;
+				case CXDiagnostic_Warning:
+					formatted = clang_formatDiagnostic(diag, 
+							clang_defaultDiagnosticDisplayOptions());
+					print_error("Warning: \n\t%s\n", clang_getCString(formatted));
+					clang_disposeString(formatted);
+					break;
+				default:
+			}
+			clang_disposeDiagnostic(diag);
+		}
+
+		if (has_error) {
+			print_error("Errors detected parsing TU %d\n", i);
+			ret = ERR_SYNTAX;
+			goto free_tu_array;
+		}
 	}
 
 	process_tu_array(tu_array, client_data);
-	
+
 	if (client_data->funcs->size != client_data->func_names->count) {
 		print_error("Could not find some functions you were looking for.\n");
 		ret = ERR_NOT_FOUND;
 		goto free_tu_array;
 	}
 
-	print_debug("number of FuncInfo structs: %zu\n", client_data->funcs->size);
+	for (size_t i = 0; i < client_data->funcs->size; ++i) {
+		process_func_info(client_data->funcs->data+i, client_data);
+	}
 
-	//for (size_t i = 0; i < client_data->funcs->size; ++i) {
-	//	print_func_info(client_data->funcs->data+i, 1);
-	//}
+	if (arg_verbose) {
+		print_verbose("Global variable USRs: ");
+		aos_print_strings(client_data->global_usrs);
+		printf("\n");
+
+		print_func_info_array(client_data->funcs, 0);
+	}
 
 free_tu_array:
-	free(tu_array);
+	free_tu_array(tu_array, client_data->file_names->count);
 
 free_priv:
 	prong_free_priv(client_data);

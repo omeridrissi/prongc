@@ -9,6 +9,13 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 					    CXCursor parent_cursor, 
 					    CXClientData client_data)
 {
+
+	/* Skip cursors that exist inside system header files */
+	CXSourceLocation cursor_location = clang_getCursorLocation(current_cursor);
+	if (clang_Location_isInSystemHeader(cursor_location)) {
+		return CXChildVisit_Continue;
+	}
+
 	struct prong_priv *prong_priv = (struct prong_priv *)client_data;
 
 	CXString parent_display_name = clang_getCursorDisplayName(parent_cursor);
@@ -38,9 +45,10 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 					&parent_cursor,
 					clang_getCString(cursor_usr),
 					clang_getCString(parent_display_name));
-			
+
 			clang_disposeString(cursor_usr);
 		}
+		clang_disposeString(parent_display_name);
 		return CXChildVisit_Continue;
 	}
 
@@ -48,7 +56,6 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	if (current_cursor_kind == CXCursor_VarDecl) { 
 		enum CXLinkageKind current_cursor_linkage = 
 			clang_getCursorLinkage(current_cursor);
-		
 		/* Fish out static and extern variables */
 		if (current_cursor_linkage == CXLinkage_External ||
 		    current_cursor_linkage == CXLinkage_Internal) {
@@ -59,6 +66,7 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 
 			clang_disposeString(cursor_usr);
 		}
+		clang_disposeString(parent_display_name);
 
 		return CXChildVisit_Continue;
 	}
@@ -83,30 +91,21 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 	enum CXCursorKind current_cursor_kind = clang_getCursorKind(current_cursor);
 	enum CXLinkageKind current_cursor_linkage = clang_getCursorLinkage(current_cursor);
 
-	/* If this is true, we have ourselves a
-	 * local variable declaration */
-	if (current_cursor_kind == CXCursor_VarDecl &&
-	    current_cursor_linkage == CXLinkage_NoLinkage) {
+	if (current_cursor_linkage == CXLinkage_NoLinkage) {
 		CXString current_cursor_usr = clang_getCursorUSR(current_cursor);
-
-		const char *current_usr_string = clang_getCString(current_cursor_usr);
-		aos_push_string(prong_priv->current_func->locals, current_usr_string);
-
+		switch (current_cursor_kind) {
+			case CXCursor_VarDecl:
+				aos_push_string(prong_priv->current_func->locals, 
+						clang_getCString(current_cursor_usr));
+				break;
+			case CXCursor_ParmDecl:
+				aos_push_string(prong_priv->current_func->params,
+						clang_getCString(current_cursor_usr));
+				break;
+			default:
+				
+		}
 		clang_disposeString(current_cursor_usr);
-
-	}
-	
-	/* If this is true, we have ourselves a
-	 * parameter declaration */
-	if (current_cursor_kind == CXCursor_ParmDecl && 
-	    current_cursor_linkage == CXLinkage_NoLinkage) {
-		CXString current_cursor_usr = clang_getCursorUSR(current_cursor);
-
-		const char *current_usr_string = clang_getCString(current_cursor_usr);
-		aos_push_string(prong_priv->current_func->params, current_usr_string);
-
-		clang_disposeString(current_cursor_usr);
-
 	}
 
 	/* If we have a function call, push that function's
@@ -115,7 +114,6 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 	 * function */
 	if (current_cursor_kind == CXCursor_CallExpr) {
 		CXCursor callee_decl = clang_getCursorReferenced(current_cursor);
-
 		if (!clang_Cursor_isNull(callee_decl)) {
 			CXCursor callee_def = clang_getCursorDefinition(callee_decl);
 			if (!clang_Cursor_isNull(callee_def)) {
@@ -142,11 +140,12 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						  client_data);
 			}
 		}
+		
 	}
 
 	prong_priv->recursion_depth--;
 
-	return CXChildVisit_Continue;
+	return CXChildVisit_Recurse;
 }
 
 /* Allocates an array of CXTranslationUnit structs */
@@ -156,6 +155,13 @@ CXTranslationUnit *alloc_tu_array(int length)
 	tus = (CXTranslationUnit*)malloc(sizeof(CXTranslationUnit) * length);
 
 	return tus;
+}
+
+void free_tu_array(CXTranslationUnit *tu_array, int length)
+{
+	for (int i = 0; i < length; ++i) {
+		clang_disposeTranslationUnit(tu_array[i]);
+	}
 }
 
 /* Checks if a cursor struct is uninitialized */
@@ -169,6 +175,38 @@ bool cursor_empty(CXCursor *cursor)
 		return false;
 	else
 		return true;
+}
+
+/* Gets root cursor and visit it's children with
+ * prong_visitor_walk_ast() function*/
+void process_tu_array(CXTranslationUnit *tu_array, 
+		      struct prong_priv *client_data) 
+{
+	for (size_t i = 0; i < client_data->file_names->count; ++i) {
+		CXCursor cursor = clang_getTranslationUnitCursor(tu_array[i]); 
+
+		/* Find our desired function declaration cursors and push them to
+		 * our cursor list inside of client_data */
+		clang_visitChildren(cursor, 
+				    prong_visitor_walk_ast, 
+				    (void*)client_data);
+	}
+
+}
+
+/* Recursively visits and processes FuncInfo struct
+ * process_func_info->clang_visitChildren->
+ * prong_visitor_walk_func->process_func_info */
+void process_func_info(FuncInfo *func_info,
+			struct prong_priv *client_data)
+{
+	FuncInfo *prev_func_info = client_data->current_func;
+	client_data->current_func = func_info;
+	
+	clang_visitChildren(func_info->cursor,
+			    prong_visitor_walk_func,
+			    (void*)client_data);
+	client_data->current_func = prev_func_info;
 }
 
 /* Initializes the state we're going to be
@@ -198,7 +236,7 @@ exit:
 	return NULL;
 }
 
-/* Frees state (prong_priv) and it's allocated fields */
+/* Frees prong_priv struct and it's allocated fields */
 void prong_free_priv(struct prong_priv *prong_priv) 
 {
 	if (prong_priv->func_names)
@@ -218,41 +256,16 @@ void prong_free_priv(struct prong_priv *prong_priv)
 	
 }
 
-/* Gets root cursor and visit it's children with
- * prong_visitor_walk_ast() function*/
-void process_tu_array(CXTranslationUnit *tu_array, 
-		      struct prong_priv *client_data) 
-{
-	for (size_t i = 0; i < client_data->file_names->count; ++i) {
-		CXCursor cursor = clang_getTranslationUnitCursor(tu_array[i]); 
-
-		/* Find our desired function declaration cursors and push them to
-		 * our cursor list inside of client_data */
-		clang_visitChildren(cursor, 
-				    prong_visitor_walk_ast, 
-				    (void*)client_data);
-	}
-
-}
-
-void process_func_info(FuncInfo *func_info,
-			struct prong_priv *client_data)
-{
-	client_data->current_func = func_info;
-	
-	clang_visitChildren(*func_info->cursor,
-			    prong_visitor_walk_func,
-			    (void*)client_data);
-}
-
-void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
+/* Turns comma-separated strings into a 
+ * dynamic string array DynamicAOS */
+static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 {
 	char *files_str_array = strdup(str_in);
 	char *temp = files_str_array;
 	size_t num_files = 1;
 	int offset = 0;
 	while (temp[offset] != '\0') {
-		if (temp[offset] == ',') {
+		if (temp[offset] == ';') {
 			temp[offset] = '\0';
 			num_files++;
 		}
@@ -302,7 +315,7 @@ error_t process_args(int argc, char **argv,
 }
 
 void print_usage(const char *prog_name) {
-    printf("Usage: %s --files=<file1,file2,...> --functions=<func1,func2,...> [OPTIONS]\n", prog_name);
+    printf("Usage: %s --files=\"file1;file2;...\" --functions=\"func1;func2;...\" [OPTIONS]\n", prog_name);
     printf("\n");
     printf("Required arguments:\n");
     printf("  --files=LIST        Comma-separated list of input source files\n");
@@ -351,7 +364,7 @@ void print_error(const char *format, ...)
 	va_list args;
 	va_start(args, format);
 
-	printf("\033[37;41m[err]\033[0m ");
+	fprintf(stderr, "\033[37;41m[err]\033[0m ");
 	vprintf(format, args);
 
 	va_end(args);

@@ -14,6 +14,9 @@ extern bool arg_verbose;
 extern bool arg_help;
 
 CXTranslationUnit	*alloc_tu_array(int length);
+void			free_tu_array(CXTranslationUnit *tu_array, int length);
+
+bool cursor_empty(CXCursor *cursor);
 
 void process_tu_array(CXTranslationUnit *tu_array, 
 		      struct prong_priv *client_data);
