@@ -20,6 +20,32 @@ typedef enum {
 	ERR_IO
 } error_t;
 
+/* Variable access types */
+typedef enum {
+	VarAccess_Read = 0,	// "var1 = var2"
+	VarAccess_Write,	// "var2 = var1"
+	VarAccess_Escape,	// "func(var1)", variable passed as param
+				// to function that we can't recurse through,
+				// and variable is a pointer or struct.
+} VarAccessType;
+
+/* Struct that will represent a single
+ * variable access */
+typedef struct {
+	char		*usr;
+	char		*name;
+	char		*esc_func_name; // Only if type is VarAccess_Escape
+	int		line;
+	int		column;
+	VarAccessType	type;
+} VarAccess;
+
+typedef struct {
+	size_t		size;
+	size_t		capacity;
+	VarAccess	*data;
+} VarAccessArr;
+
 /* Forward declaration */
 typedef struct FuncInfo FuncInfo;
 
@@ -41,7 +67,10 @@ struct FuncInfo {
 	/* For dependency tracking */
 	FuncInfoArr	*callees;
 
-	bool processed;		// Have we visited it's body yet?
+	VarAccessArr	*var_accesses;
+
+	bool in_system_header;	// Is function definition inside of
+				// system header?
 };
 
 /* The prong_priv struct will hold the program
@@ -56,7 +85,8 @@ struct prong_priv {
 	/* Function registry declaration */
 	FuncInfoArr	*funcs;
 	FuncInfo	*current_func; // Current traversal state
-	
+	DynamicAOS	*touched_func_usrs; // List of processed funcs
+
 	size_t		recursion_depth; // Recursion depth for callees
 					 // (changes with each recursion)
 	/* Visitor function error return */

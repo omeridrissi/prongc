@@ -1,10 +1,12 @@
 #include "func_info.h"
 #include "dyn_aos.h"
 #include "core.h"
+#include "var_access.h"
 
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
-			 const char *elem_name)
+			 const char *elem_name,
+			 bool in_system_header)
 {
 	FuncInfo *func_info;
 	func_info = malloc(sizeof(*func_info));
@@ -19,6 +21,8 @@ FuncInfo *init_func_info(CXCursor *cursor,
 	if (cursor != NULL) {
 		func_info->cursor = *cursor;
 	}
+
+	func_info->in_system_header = in_system_header;
 
 	func_info->params = init_aos();
 	func_info->locals = init_aos();
@@ -38,11 +42,12 @@ void free_func_info(FuncInfo *func_info)
 
 void push_func_info(FuncInfoArr *func_info_array,
 		    CXCursor *cursor, const char *usr,
-		    const char *elem_name)
+		    const char *elem_name, bool in_system_header)
 {
 	FuncInfo *func_info = init_func_info(cursor,
 					     usr,
-					     elem_name);
+					     elem_name,
+					     in_system_header);
 
 	if ((func_info_array->size+1)*sizeof(FuncInfo) > func_info_array->capacity) {
 		func_info_array->capacity *= 2;
@@ -69,12 +74,20 @@ void print_func_info(FuncInfo *func_info, int indentation)
 	printf("%*s|_ local vars: ", indentation+x, "");
 	aos_print_strings(func_info->locals);
 	printf("\n");
+	if (func_info->in_system_header) {
+		printf("%*s|_ is in system header: true\n", indentation+x, "");
+		return;
+	} else {
+		printf("%*s|_ is in system header: false\n", indentation+x, "");
+	}
 	if (func_info->callees) {
 		printf("%*s|_ has callees: true\n", indentation+x, "");
 		printf("%*s|_ ", indentation+x, "");
 	} else {
 		printf("%*s|_ has callees: false\n", indentation+x, "");
 	}
+	if (func_info->var_accesses)
+		print_var_access_array(func_info->var_accesses, indentation+1);
 }
 
 void print_func_info_array(FuncInfoArr *func_info_array, int depth)

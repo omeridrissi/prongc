@@ -1,0 +1,107 @@
+#include "var_access.h"
+#include "log.h"
+
+VarAccess *init_var_access(const char *usr, const char *name,
+			   const char *esc_func_name,
+			   int line, int column, VarAccessType type)
+{
+	VarAccess *var_access;
+	var_access = malloc(sizeof(*var_access));
+
+	if (usr != NULL)
+		var_access->usr = strdup(usr);
+
+	if (name != NULL)
+		var_access->name = strdup(name);
+
+	var_access->line = line;
+	var_access->column = column;
+	var_access->type = type;
+
+	if (var_access->esc_func_name != NULL)
+		var_access->esc_func_name = strdup(esc_func_name);
+	else
+		var_access->esc_func_name = NULL;
+
+	return var_access;
+}
+
+void free_var_access(VarAccess *var_access) 
+{
+	free(var_access->usr);
+	free(var_access->name);
+	if (var_access->esc_func_name)
+		free(var_access->esc_func_name);
+
+	free(var_access);
+}
+
+VarAccessArr *init_var_access_array()
+{
+	VarAccessArr *var_access_array;
+	var_access_array = malloc(sizeof(*var_access_array));
+
+	var_access_array->size = 0;
+	var_access_array->capacity = VAR_ACC_ARR_INIT_CAP;
+	var_access_array->data = malloc(sizeof(*var_access_array)*VAR_ACC_ARR_INIT_CAP);
+
+	return var_access_array;
+}
+
+void free_var_access_array(VarAccessArr *var_access_array)
+{
+	free(var_access_array->data);
+	free(var_access_array);
+}
+
+void push_var_access(VarAccessArr *var_access_array,
+			const char *usr, const char *name, 
+			const char *esc_func_name, int line,
+			int column, VarAccessType type)
+{
+	VarAccess *var_access = init_var_access(usr, name, 
+						esc_func_name, line,
+						column, type);
+
+	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
+		var_access_array->capacity *= 2;
+		var_access_array->data = reallocarray(var_access_array->data,
+						var_access_array->capacity,
+						sizeof(VarAccess));
+	}
+
+	memcpy(var_access_array->data+var_access_array->size,
+			var_access, sizeof(VarAccess));
+	var_access_array->size++;
+
+	free(var_access);
+
+}
+
+void print_var_access(VarAccess *var_access, int indentation)
+{
+	printf("|_%*sVariable access: \n", indentation, "");
+	printf("| %*sname: %s\n", indentation+1, "", var_access->name);
+	printf("| %*susr: %s\n", indentation+1, "", var_access->usr);
+	printf("| %*sline: %d\n", indentation+1, "", var_access->line);
+	printf("| %*scol: %d\n", indentation+1, "", var_access->column);
+	printf("| %*stype: ", indentation+1, "");
+	switch (var_access->type) {
+		case VarAccess_Read:
+			printf("read\n");
+			break;
+		case VarAccess_Write:
+			printf("write\n");
+			break;
+		case VarAccess_Escape:
+			printf("passed to callee\n");
+			break;
+	}
+}
+
+void print_var_access_array(VarAccessArr *var_access_array, int indentation) 
+{
+	for (size_t i = 0; i < var_access_array->size; ++i) {
+		print_var_access(&var_access_array->data[i], indentation);
+	}
+}

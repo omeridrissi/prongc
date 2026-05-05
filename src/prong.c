@@ -6,6 +6,7 @@
 #include "core.h"
 #include "dyn_aos.h"
 #include "func_info.h"
+#include "log.h"
 
 bool arg_verbose = false;
 bool arg_help = false;
@@ -111,6 +112,8 @@ int main(int argc, char **argv)
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
 		process_func_info(client_data->funcs->data+i, client_data);
 	}
+	
+	reset_aos(&client_data->touched_func_usrs);
 
 	if (arg_verbose) {
 		print_verbose("Global variable USRs: ");

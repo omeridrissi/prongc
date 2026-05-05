@@ -1,6 +1,8 @@
 #include "core.h"
 #include "dyn_aos.h"
 #include "func_info.h"
+#include "var_access.h"
+#include "log.h"
 
 /* Visitor function for matching our specified 
  * function in args to our desired function 
@@ -44,7 +46,8 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 			push_func_info(prong_priv->funcs,
 					&parent_cursor,
 					clang_getCString(cursor_usr),
-					clang_getCString(parent_display_name));
+					clang_getCString(parent_display_name),
+					false);
 
 			clang_disposeString(cursor_usr);
 		}
@@ -76,12 +79,110 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	return CXChildVisit_Recurse;
 }
 
+static bool operator_is_assignment(CXCursor cursor) {
+	enum CXBinaryOperatorKind opcode = clang_getCursorBinaryOperatorKind(cursor);
+	print_debug("binop opcode: %d\n", opcode);
+	/* If it's any type of assignment */
+	switch (opcode) {
+		case CXBinaryOperator_Assign:       // =
+        	case CXBinaryOperator_AddAssign:    // +=
+        	case CXBinaryOperator_SubAssign:    // -=
+        	case CXBinaryOperator_MulAssign:    // *=
+        	case CXBinaryOperator_DivAssign:    // /=
+        	case CXBinaryOperator_RemAssign:    // %=
+        	case CXBinaryOperator_ShlAssign:    // <<=
+        	case CXBinaryOperator_ShrAssign:    // >>=
+        	case CXBinaryOperator_AndAssign:    // &=
+        	case CXBinaryOperator_XorAssign:    // ^=
+        	case CXBinaryOperator_OrAssign:     // |=
+			// This is an assignment operation, now check LHS position
+			return true;
+			break;
+        	default:
+			return false;  // Not an assignment operator
+	}
+}
+
+static enum CXChildVisitResult get_first_child_visitor(CXCursor cursor,
+						     CXCursor parent,
+						     CXClientData data)
+{
+	(void)parent;
+	CXCursor *result = (CXCursor *)data;
+	*result = cursor;
+	return CXChildVisit_Break;
+}
+CXCursor get_cursor_first_child(CXCursor cursor)
+{
+	CXCursor result;
+	clang_visitChildren(cursor, get_first_child_visitor, &result);
+	return result;
+}
+
+static enum CXChildVisitResult get_first_usr_visitor(CXCursor cursor,
+						     CXCursor parent,
+						     CXClientData data)
+{
+	(void)parent;
+	char **result = (char **)data;
+	CXCursor cursor_referenced = clang_getCursorReferenced(cursor);
+	CXString cxstring = clang_getCursorUSR(cursor_referenced);
+	*result = strdup(clang_getCString(cxstring));
+	clang_disposeString(cxstring);
+	return CXChildVisit_Break;
+}
+char *get_cursor_first_child_usr(CXCursor cursor)
+{
+	char *result;
+	clang_visitChildren(cursor, get_first_usr_visitor, &result);
+	return result;
+}
+
+/* Goes into the cursor's parents as far as
+ * possible and returns a parent that matches 
+ * the specified kind */
+static CXCursor get_super_parent_of_kind(CXCursor cursor, enum CXCursorKind kind) 
+{
+	CXCursor super_parent = clang_getCursorSemanticParent(cursor);
+	while (clang_getCursorKind(super_parent) != kind) {
+		if (clang_Cursor_isNull(super_parent))
+			return super_parent;
+		super_parent = clang_getCursorSemanticParent(super_parent);
+	}
+	return super_parent;
+}
+
+typedef struct {
+	CXCursor cursor;
+	bool boolean;
+} CursorBoolPair;
+
+static enum CXChildVisitResult in_cursor_branch_visitor(CXCursor cursor,
+							CXCursor parent,
+							CXClientData data)
+{
+	(void)parent; // Casted to void cuz unused
+	CursorBoolPair *pair = (CursorBoolPair*)data;
+	if (clang_equalCursors(cursor, pair->cursor)) {
+		pair->boolean = true;
+		return CXChildVisit_Break;
+	}
+	return CXChildVisit_Recurse;
+}
+
+static bool in_cursor_branch(CXCursor branch, CXCursor cursor)
+{
+	CursorBoolPair pair = {.cursor = cursor, .boolean = false};
+	clang_visitChildren(branch, in_cursor_branch_visitor, &pair);
+	return pair.boolean;
+}
+
 /* Visitor function for looping through 
  * the children of the compound statement cursor 
  * relating to the function we've filtered 
  * out from the AST */
 static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
-						CXCursor parent_cursor,
+						[[maybe_unused]]CXCursor parent_cursor,
 						CXClientData client_data)
 {
 	struct prong_priv *prong_priv = (struct prong_priv*)client_data;
@@ -108,6 +209,95 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		clang_disposeString(current_cursor_usr);
 	}
 
+	if (current_cursor_kind == CXCursor_DeclRefExpr) {
+		FuncInfo *current_func = prong_priv->current_func;
+		if (!current_func->var_accesses)
+			current_func->var_accesses = init_var_access_array();
+
+		//CXCursor parent_cursor = clang_getCursorLexicalParent(current_cursor);
+		/* Check if this is an assignment */
+		enum CXCursorKind refexpr_parent_kind = clang_getCursorKind(parent_cursor);
+		print_debug("Immediate parent kind: %d\n", refexpr_parent_kind);
+
+		CXCursor referenced_cursor = clang_getCursorReferenced(current_cursor);
+		CXString current_usr = clang_getCursorUSR(referenced_cursor);
+		CXString current_name = clang_getCursorDisplayName(referenced_cursor);
+		
+		CXSourceLocation location = clang_getCursorLocation(current_cursor);
+		CXString current_filename;
+		unsigned current_line, current_column;
+		
+		clang_getPresumedLocation(location, &current_filename, 
+					  &current_line, &current_column);
+
+		print_debug("Found CXCursor_DeclRefExpr\n");
+		if (refexpr_parent_kind == CXCursor_BinaryOperator &&
+		    operator_is_assignment(parent_cursor)) {
+			print_debug("And it's a binary operator!\n");
+			char *first_child_usr = get_cursor_first_child_usr(parent_cursor);
+			if (strcmp(clang_getCString(current_usr), first_child_usr) == 0) {
+				// Push as write
+				push_var_access(current_func->var_accesses,
+						clang_getCString(current_usr),
+						clang_getCString(current_name),
+						NULL, current_line, current_column, VarAccess_Write);
+			} else {
+				// Push as read
+				push_var_access(current_func->var_accesses,
+						clang_getCString(current_usr),
+						clang_getCString(current_name),
+						NULL, current_line, current_column, VarAccess_Read);
+			}
+			free(first_child_usr);
+		} else if (refexpr_parent_kind == CXCursor_UnaryOperator) {
+			print_debug("And it's a unary operator!\n");
+			enum CXUnaryOperatorKind unop_kind =
+				clang_getCursorUnaryOperatorKind(parent_cursor);
+			if (unop_kind == CXUnaryOperator_Deref) {
+				CXCursor binop_super_parent = 
+					get_super_parent_of_kind(parent_cursor, 
+								 CXCursor_BinaryOperator);
+				CXCursor super_parent_lhs = get_cursor_first_child(binop_super_parent);
+
+				// Push as write if LHS
+				if (in_cursor_branch(super_parent_lhs, current_cursor)) {
+					// Push as write
+					push_var_access(current_func->var_accesses,
+							clang_getCString(current_usr),
+							clang_getCString(current_name),
+							NULL, current_line, current_column, VarAccess_Write);
+				} else {
+					// Push as read if not
+					push_var_access(current_func->var_accesses,
+							clang_getCString(current_usr),
+							clang_getCString(current_name),
+							NULL, current_line, current_column, VarAccess_Read);
+				}
+
+
+			} else if (unop_kind == CXUnaryOperator_PreInc ||
+				   unop_kind == CXUnaryOperator_PostInc ||
+				   unop_kind == CXUnaryOperator_PreDec ||
+				   unop_kind == CXUnaryOperator_PostDec) {
+				// Definitely push as write
+				push_var_access(current_func->var_accesses,
+						clang_getCString(current_usr),
+						clang_getCString(current_name),
+						NULL, current_line, current_column, VarAccess_Write);
+			} else {
+				// Push as read
+				push_var_access(current_func->var_accesses,
+						clang_getCString(current_usr),
+						clang_getCString(current_name),
+						NULL, current_line, current_column, VarAccess_Read);
+			}
+		} 
+		
+		clang_disposeString(current_usr);
+		clang_disposeString(current_name);
+		clang_disposeString(current_filename);
+	}
+
 	/* If we have a function call, push that function's
 	 * definition onto the list of callees in our current
 	 * FuncInfo struct, then recursively process that 
@@ -116,33 +306,58 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		CXCursor callee_decl = clang_getCursorReferenced(current_cursor);
 		if (!clang_Cursor_isNull(callee_decl)) {
 			CXCursor callee_def = clang_getCursorDefinition(callee_decl);
-			if (!clang_Cursor_isNull(callee_def)) {
-				CXString callee_usr = clang_getCursorUSR(callee_def);
-				CXString callee_name = clang_getCursorDisplayName(callee_def);
-			
-				// Checks if callee array is initialized
-				if (!prong_priv->current_func->callees)
-					prong_priv->current_func->callees = 
-						init_func_info_array();
+			CXCursor working_cursor = callee_def;
 
-				push_func_info(
-					prong_priv->current_func->callees,
-					&callee_def,
-					clang_getCString(callee_usr),
-					clang_getCString(callee_name));
-				
+			if (clang_Cursor_isNull(callee_def))
+				working_cursor = callee_decl;
+
+			CXString callee_usr = clang_getCursorUSR(working_cursor);
+			CXString callee_name = clang_getCursorDisplayName(working_cursor);
+
+			// Make sure we don't fall into an
+			// infinite recursion loop
+			if (aos_contains_string(prong_priv->touched_func_usrs,
+						clang_getCString(callee_usr))) {
 				clang_disposeString(callee_usr);
 				clang_disposeString(callee_name);
-
-				process_func_info(func_info_array_tail(
-							prong_priv->current_func->callees
-						  ),
-						  client_data);
+				goto visitor_recurse;
 			}
+
+			aos_push_string(prong_priv->touched_func_usrs,
+					clang_getCString(callee_usr));
+
+			// Checks if callee array is initialized
+			if (!prong_priv->current_func->callees)
+				prong_priv->current_func->callees = 
+					init_func_info_array();
+			
+			CXSourceLocation callee_location = 
+				clang_getCursorLocation(working_cursor);
+			
+			push_func_info(
+				prong_priv->current_func->callees,
+				&working_cursor,
+				clang_getCString(callee_usr),
+				clang_getCString(callee_name),
+				clang_Location_isInSystemHeader(callee_location));
+			
+			clang_disposeString(callee_usr);
+			clang_disposeString(callee_name);
+			
+			if (func_info_array_tail(
+			    prong_priv->current_func->callees)->in_system_header) {
+				goto visitor_recurse;
+			}
+			process_func_info(func_info_array_tail(
+						prong_priv->current_func->callees
+					  ),
+					  client_data);
+
 		}
-		
+		goto visitor_recurse;	
 	}
 
+visitor_recurse:
 	prong_priv->recursion_depth--;
 
 	return CXChildVisit_Recurse;
@@ -229,6 +444,7 @@ struct prong_priv *prong_init_priv()
 	prong_priv->global_usrs = init_aos();
 
 	prong_priv->funcs = init_func_info_array();
+	prong_priv->touched_func_usrs = init_aos();
 
 	return prong_priv;
 
@@ -247,9 +463,11 @@ void prong_free_priv(struct prong_priv *prong_priv)
 	if (prong_priv->global_usrs)
 		free_aos(prong_priv->global_usrs);
 
-	if (prong_priv->funcs) {
+	if (prong_priv->funcs)
 		free_func_info_array(prong_priv->funcs);
-	}
+
+	if (prong_priv->touched_func_usrs)
+		free_aos(prong_priv->touched_func_usrs);
 	
 	if (prong_priv)
 		free(prong_priv);
@@ -328,45 +546,5 @@ void print_usage(const char *prog_name) {
     printf("Examples:\n");
     printf("  %s --files=main.c,util.c --functions=init,run\n", prog_name);
     printf("  %s --files=a.c,b.c,c.c --functions=foo,bar --verbose\n", prog_name);
-}
-
-/* This function shouldn't be used in final commits. 
- * Ideally, it should only be when debugging locally */
-void print_debug(const char *format, ...)
-{
-	va_list args;
-	va_start(args, format);
-
-	printf("[dbg] ");
-	vprintf(format, args);
-
-	va_end(args);
-}
-
-/* This function should be used when printing information
- * that otherwise wouldn't be printed if the '--verbose' option 
- * isn't selected in the command line arguments */
-void print_verbose(const char *format, ...)
-{
-	va_list args;
-	va_start(args, format);
-
-	printf("[ver] ");
-	vprintf(format, args);
-
-	va_end(args);
-}
-
-/* This should be used for printing fatal errors that 
- * result in prongc exitting */
-void print_error(const char *format, ...)
-{
-	va_list args;
-	va_start(args, format);
-
-	fprintf(stderr, "\033[37;41m[err]\033[0m ");
-	vprintf(format, args);
-
-	va_end(args);
 }
 

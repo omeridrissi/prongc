@@ -13,13 +13,15 @@ extern bool arg_help;
 
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
-			 const char *elem_name);
+			 const char *elem_name,
+			 bool in_system_header);
 void free_func_info(FuncInfo *func_info);
 
 void push_func_info(FuncInfoArr *func_info_array,
 		    CXCursor *cursor,
 		    const char *usr, 
-		    const char *elem_name);
+		    const char *elem_name,
+		    bool in_system_header);
 
 FuncInfo *func_info_array_tail(FuncInfoArr *func_info_array);
 FuncInfo *func_info_array_head(FuncInfoArr *func_info_array);

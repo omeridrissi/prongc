@@ -37,6 +37,12 @@ void free_aos(DynamicAOS *array)
 	array->data = NULL;
 }
 
+void reset_aos(DynamicAOS **array)
+{
+	free_aos(*array);
+	*array = init_aos();
+}
+
 /* Push string on top of the array, automatically 
  * realloc if not enough size */
 error_t aos_push_string(DynamicAOS *array, const char *str)
