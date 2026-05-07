@@ -33,6 +33,31 @@ void push_cursor(CXCursorArr *cursor_array, CXCursor *cursor)
 	cursor_array->size++;
 }
 
+typedef struct {
+	CXCursor cursor;
+	bool boolean;
+} CursorBoolPair;
+
+static enum CXChildVisitResult in_cursor_branch_visitor(CXCursor cursor,
+							CXCursor parent,
+							CXClientData data)
+{
+	(void)parent; // Casted to void cuz unused
+	CursorBoolPair *pair = (CursorBoolPair*)data;
+	if (clang_equalCursors(cursor, pair->cursor)) {
+		pair->boolean = true;
+		return CXChildVisit_Break;
+	}
+	return CXChildVisit_Recurse;
+}
+
+bool in_cursor_branch(CXCursor branch, CXCursor cursor)
+{
+	CursorBoolPair pair = {.cursor = cursor, .boolean = false};
+	clang_visitChildren(branch, in_cursor_branch_visitor, &pair);
+	return pair.boolean;
+}
+
 void print_cursor_array(CXCursorArr *cursor_array)
 {
 	for (int i = 0; i < cursor_array->size; ++i) {
