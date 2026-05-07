@@ -73,6 +73,12 @@ struct FuncInfo {
 				// system header?
 };
 
+typedef struct {
+	size_t		size;
+	size_t		capacity;
+	CXCursor	*data;
+} CXCursorArr;
+
 /* The prong_priv struct will hold the program
  * state and contain various types of data that
  * our program will collect and use over time */
@@ -82,6 +88,11 @@ struct prong_priv {
 	
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
 	
+	/* Contains all cursors that we save for later 
+	 * processing of their corresponding children 
+	 * (mainly BinaryOperator and UnaryOperator kinds)*/
+	CXCursorArr	*ancestor_registry;
+
 	/* Function registry declaration */
 	FuncInfoArr	*funcs;
 	FuncInfo	*current_func; // Current traversal state

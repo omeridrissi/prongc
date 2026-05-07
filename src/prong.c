@@ -6,6 +6,7 @@
 #include "core.h"
 #include "dyn_aos.h"
 #include "func_info.h"
+#include "cursor_arr.h"
 #include "log.h"
 
 bool arg_verbose = false;
@@ -113,6 +114,7 @@ int main(int argc, char **argv)
 		process_func_info(client_data->funcs->data+i, client_data);
 	}
 	
+	print_cursor_array(client_data->ancestor_registry);
 	reset_aos(&client_data->touched_func_usrs);
 
 	if (arg_verbose) {

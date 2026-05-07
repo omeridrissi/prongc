@@ -2,6 +2,7 @@
 #include "dyn_aos.h"
 #include "func_info.h"
 #include "var_access.h"
+#include "cursor_arr.h"
 #include "log.h"
 
 /* Visitor function for matching our specified 
@@ -141,15 +142,32 @@ char *get_cursor_first_child_usr(CXCursor cursor)
 /* Goes into the cursor's parents as far as
  * possible and returns a parent that matches 
  * the specified kind */
-static CXCursor get_super_parent_of_kind(CXCursor cursor, enum CXCursorKind kind) 
+static CXCursor get_ancestor_of_kind(CXCursor cursor, enum CXCursorKind kind) 
 {
-	CXCursor super_parent = clang_getCursorSemanticParent(cursor);
-	while (clang_getCursorKind(super_parent) != kind) {
-		if (clang_Cursor_isNull(super_parent))
-			return super_parent;
-		super_parent = clang_getCursorSemanticParent(super_parent);
+	CXCursor parent = clang_getCursorLexicalParent(cursor);
+	print_debug("lexical parent kind: %d\n", clang_getCursorKind(parent));
+	while (!clang_Cursor_isNull(parent)) { 
+		if (clang_getCursorKind(parent) == kind)
+			return parent;
+		parent = clang_getCursorSemanticParent(parent);
 	}
-	return super_parent;
+	return parent;
+}
+
+static CXCursor get_assignment_ancestor(CXCursor cursor) 
+{
+	CXCursor binop_assignment_ancestor = get_ancestor_of_kind(cursor, 
+								  CXCursor_BinaryOperator);
+	if (clang_Cursor_isNull(binop_assignment_ancestor))
+		print_debug("binop_assignment_ancestor is null on first return \n");
+	while (!clang_Cursor_isNull(binop_assignment_ancestor) &&
+		!operator_is_assignment(binop_assignment_ancestor)) {
+		binop_assignment_ancestor = 
+			get_ancestor_of_kind(binop_assignment_ancestor,
+					     CXCursor_BinaryOperator);
+	}
+
+	return binop_assignment_ancestor;
 }
 
 typedef struct {
@@ -209,10 +227,17 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		clang_disposeString(current_cursor_usr);
 	}
 
+	if (current_cursor_kind == CXCursor_BinaryOperator &&
+	    operator_is_assignment(current_cursor)) {
+		push_cursor(prong_priv->ancestor_registry, &current_cursor);
+	}
+
 	if (current_cursor_kind == CXCursor_DeclRefExpr) {
 		FuncInfo *current_func = prong_priv->current_func;
 		if (!current_func->var_accesses)
 			current_func->var_accesses = init_var_access_array();
+		
+		print_debug("Found CXCursor_DeclRefExpr\n");
 
 		//CXCursor parent_cursor = clang_getCursorLexicalParent(current_cursor);
 		/* Check if this is an assignment */
@@ -229,8 +254,10 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		
 		clang_getPresumedLocation(location, &current_filename, 
 					  &current_line, &current_column);
-
-		print_debug("Found CXCursor_DeclRefExpr\n");
+		
+		CXCursor binop_assignment_ancestor = get_assignment_ancestor(current_cursor);
+		
+		goto visitor_recurse;
 		if (refexpr_parent_kind == CXCursor_BinaryOperator &&
 		    operator_is_assignment(parent_cursor)) {
 			print_debug("And it's a binary operator!\n");
@@ -254,10 +281,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			enum CXUnaryOperatorKind unop_kind =
 				clang_getCursorUnaryOperatorKind(parent_cursor);
 			if (unop_kind == CXUnaryOperator_Deref) {
-				CXCursor binop_super_parent = 
-					get_super_parent_of_kind(parent_cursor, 
-								 CXCursor_BinaryOperator);
-				CXCursor super_parent_lhs = get_cursor_first_child(binop_super_parent);
+				CXCursor super_parent_lhs = get_cursor_first_child(binop_assignment_ancestor);
 
 				// Push as write if LHS
 				if (in_cursor_branch(super_parent_lhs, current_cursor)) {
@@ -443,8 +467,11 @@ struct prong_priv *prong_init_priv()
 
 	prong_priv->global_usrs = init_aos();
 
+	prong_priv->ancestor_registry = init_cursor_array();
+
 	prong_priv->funcs = init_func_info_array();
 	prong_priv->touched_func_usrs = init_aos();
+
 
 	return prong_priv;
 
@@ -468,6 +495,9 @@ void prong_free_priv(struct prong_priv *prong_priv)
 
 	if (prong_priv->touched_func_usrs)
 		free_aos(prong_priv->touched_func_usrs);
+
+	if (prong_priv->ancestor_registry)
+		free_cursor_array(prong_priv->ancestor_registry);
 	
 	if (prong_priv)
 		free(prong_priv);
