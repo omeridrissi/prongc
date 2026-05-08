@@ -58,9 +58,27 @@ bool in_cursor_branch(CXCursor branch, CXCursor cursor)
 	return pair.boolean;
 }
 
+bool in_cursor_array(CXCursorArr *array, CXCursor cursor)
+{
+	for (size_t i = 0; i < array->size; ++i) {
+		if (in_cursor_branch(array->data[i], cursor)) 
+			return true;
+	}
+	return false;
+}
+
+CXCursor get_branch_containing_cursor(CXCursorArr *array, CXCursor cursor)
+{
+	for (size_t i = 0; i < array->size; ++i) {
+		if (in_cursor_branch(array->data[i], cursor))
+			return array->data[i];
+	}
+	return clang_getNullCursor();
+}
+
 void print_cursor_array(CXCursorArr *cursor_array)
 {
-	for (int i = 0; i < cursor_array->size; ++i) {
+	for (size_t i = 0; i < cursor_array->size; ++i) {
 		CXString cursor_name = clang_getCursorDisplayName(cursor_array->data[i]);
 		printf("cursor name: %s\n", clang_getCString(cursor_name));
 		printf("cursor kind: %d\n", clang_getCursorKind(cursor_array->data[i]));

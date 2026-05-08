@@ -12,5 +12,7 @@ void		free_cursor_array(CXCursorArr *var_access_array);
 void		push_cursor(CXCursorArr *cursor_array, CXCursor *cursor);
 
 bool		in_cursor_branch(CXCursor branch, CXCursor cursor);
+bool		in_cursor_branch_array(CXCursorArr *array, CXCursor cursor);
+CXCursor	get_branch_containing_cursor(CXCursorArr *array, CXCursor cursor);
 
 void		print_cursor_array(CXCursorArr *cursor_array);
