@@ -29,6 +29,19 @@ void print_verbose(const char *format, ...)
 
 /* This should be used for printing fatal errors that 
  * result in prongc exitting */
+void print_warn(const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	fprintf(stderr, "\033[30;33m[warn]\033[0m ");
+	vprintf(format, args);
+
+	va_end(args);
+}
+
+/* This should be used for printing fatal errors that 
+ * result in prongc exitting */
 void print_error(const char *format, ...)
 {
 	va_list args;

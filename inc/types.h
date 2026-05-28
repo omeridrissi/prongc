@@ -22,10 +22,13 @@ typedef enum {
 
 /* Variable access types */
 typedef enum {
-	VarAccess_Read = 0,	// "var1 = var2"
-	VarAccess_Write,	// "var2 = var1"
+	VarAccess_Read = 0,	// "x = var1"
+	VarAccess_Write,	// "var1 = y"
+	VarAccess_PtrRead,	// reading the value pointer points to
+	VarAccess_PtrWrite,	// writing into the value pointer points to
 	VarAccess_Escape,	// "func(var1)", variable passed as param
-				// to function that we can't recurse through,
+				// to function that we may or may not be able to 
+				// recurse through,
 				// and variable is a pointer or struct.
 } VarAccessType;
 
@@ -88,18 +91,18 @@ struct prong_priv {
 	
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
 	
-	/* Contains all cursors that we save for later 
-	 * processing of their corresponding children 
-	 * (mainly BinaryOperator and UnaryOperator kinds)*/
-	CXCursorArr	*ancestor_registry;
+	/* While recursing through the children of a cursor,
+	 * stack all the parent elements back to back here,
+	 * then pop the tail when ending the recursion function */
+	CXCursorArr	*ancestry_stack;
+
+	CXCursor	last_visited;
 
 	/* Function registry declaration */
 	FuncInfoArr	*funcs;
 	FuncInfo	*current_func; // Current traversal state
 	DynamicAOS	*touched_func_usrs; // List of processed funcs
 
-	size_t		recursion_depth; // Recursion depth for callees
-					 // (changes with each recursion)
 	/* Visitor function error return */
 	error_t		err;		
 };

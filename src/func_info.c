@@ -65,29 +65,31 @@ void push_func_info(FuncInfoArr *func_info_array,
 	
 void print_func_info(FuncInfo *func_info, int indentation)
 {
-	int x = indentation*2;
+	int x = indentation*3;
 	printf("Func info \"%s\":\n", func_info->name);
-	printf("%*s|_ USR: %s\n", indentation+x, "", func_info->usr);
-	printf("%*s|_ parameters: ", indentation+x, "");
+	printf("%*s|_ USR: %s\n", x, "", func_info->usr);
+	printf("%*s|_ parameters: ", x, "");
 	aos_print_strings(func_info->params);
 	printf("\n");
-	printf("%*s|_ local vars: ", indentation+x, "");
+	printf("%*s|_ local vars: ", x, "");
 	aos_print_strings(func_info->locals);
 	printf("\n");
 	if (func_info->in_system_header) {
-		printf("%*s|_ is in system header: true\n", indentation+x, "");
+		printf("%*s|_ is in system header: true\n", x, "");
 		return;
 	} else {
-		printf("%*s|_ is in system header: false\n", indentation+x, "");
+		printf("%*s|_ is in system header: false\n", x, "");
 	}
-	if (func_info->callees) {
-		printf("%*s|_ has callees: true\n", indentation+x, "");
-		printf("%*s|_ ", indentation+x, "");
-	} else {
-		printf("%*s|_ has callees: false\n", indentation+x, "");
-	}
+	
 	if (func_info->var_accesses)
-		print_var_access_array(func_info->var_accesses, indentation+1);
+		print_var_access_array(func_info->var_accesses, indentation);
+	
+	if (func_info->callees) {
+		printf("%*s|_ has callees: true\n", x, "");
+		printf("%*s|_ ", x, "");
+	} else {
+		printf("%*s|_ has callees: false\n", x, "");
+	}
 }
 
 void print_func_info_array(FuncInfoArr *func_info_array, int depth)

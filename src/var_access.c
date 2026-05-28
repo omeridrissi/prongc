@@ -18,7 +18,7 @@ VarAccess *init_var_access(const char *usr, const char *name,
 	var_access->column = column;
 	var_access->type = type;
 
-	if (var_access->esc_func_name != NULL)
+	if (esc_func_name != NULL)
 		var_access->esc_func_name = strdup(esc_func_name);
 	else
 		var_access->esc_func_name = NULL;
@@ -80,12 +80,13 @@ void push_var_access(VarAccessArr *var_access_array,
 
 void print_var_access(VarAccess *var_access, int indentation)
 {
-	printf("|_%*sVariable access: \n", indentation, "");
-	printf("| %*sname: %s\n", indentation+1, "", var_access->name);
-	printf("| %*susr: %s\n", indentation+1, "", var_access->usr);
-	printf("| %*sline: %d\n", indentation+1, "", var_access->line);
-	printf("| %*scol: %d\n", indentation+1, "", var_access->column);
-	printf("| %*stype: ", indentation+1, "");
+	int x = indentation*3;
+	printf("%*s|_Variable access: \n", x, "");
+	printf("%*s|   name: %s\n", x, "", var_access->name);
+	printf("%*s|   usr: %s\n", x, "", var_access->usr);
+	printf("%*s|   line: %d\n", x, "", var_access->line);
+	printf("%*s|   col: %d\n", x, "", var_access->column);
+	printf("%*s|   type: ", x, "");
 	switch (var_access->type) {
 		case VarAccess_Read:
 			printf("read\n");
@@ -93,8 +94,14 @@ void print_var_access(VarAccess *var_access, int indentation)
 		case VarAccess_Write:
 			printf("write\n");
 			break;
+		case VarAccess_PtrRead:
+			printf("read from memory location\n");
+			break;
+		case VarAccess_PtrWrite:
+			printf("write to memory location\n");
+			break;
 		case VarAccess_Escape:
-			printf("passed to callee\n");
+			printf("passed to function as parameter\n");
 			break;
 	}
 }

@@ -3,4 +3,5 @@
 
 void print_verbose(const char *format, ...);
 void print_debug(const char *format, ...);
+void print_warn(const char *format, ...);
 void print_error(const char *format, ...);

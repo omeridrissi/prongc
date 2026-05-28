@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 			goto free_tu_array;
 		}
 	}
-
+	
 	process_tu_array(tu_array, client_data);
 
 	if (client_data->funcs->size != client_data->func_names->count) {
@@ -114,11 +114,25 @@ int main(int argc, char **argv)
 		process_func_info(client_data->funcs->data+i, client_data);
 	}
 	
-	print_cursor_array(client_data->ancestor_registry);
 	reset_aos(&client_data->touched_func_usrs);
 
 	if (arg_verbose) {
-		print_verbose("Global variable USRs: ");
+		print_verbose("showing raw state...\n");
+
+		print_verbose("global variable USRs: ");
+		aos_print_strings(client_data->global_usrs);
+		printf("\n");
+
+		print_func_info_array(client_data->funcs, 0);
+	}
+
+	for (size_t i = 0; i < client_data->funcs->size; ++i) {
+		unwind_func_info(&client_data->funcs->data[i], client_data);
+	}
+
+	if (arg_verbose) {
+		print_verbose("showing unwinded state...\n");
+		print_verbose("global variable USRs: ");
 		aos_print_strings(client_data->global_usrs);
 		printf("\n");
 
