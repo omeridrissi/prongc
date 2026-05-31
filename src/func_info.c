@@ -3,6 +3,11 @@
 #include "core.h"
 #include "var_access.h"
 
+// Since most of our functions handle pointers to
+// FuncInfo structs, we will point to one FuncInfo 
+// for all null FuncInfo structs
+FuncInfo empty_func_info_global = {0};
+
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
 			 const char *elem_name,
@@ -38,6 +43,16 @@ void free_func_info(FuncInfo *func_info)
 	free_aos(func_info->locals);
 
 	free(func_info);
+}
+
+FuncInfo *get_null_func_info() {
+	return &empty_func_info_global;
+}
+
+bool func_info_is_null(FuncInfo *func_info) {
+	if (func_info == &empty_func_info_global)
+		return true;
+	return false;
 }
 
 void push_func_info(FuncInfoArr *func_info_array,
@@ -92,6 +107,33 @@ void print_func_info(FuncInfo *func_info, int indentation)
 	}
 }
 
+FuncInfoArr *init_func_info_array()
+{
+	
+	FuncInfoArr *func_info_array;
+	func_info_array = malloc(sizeof(*func_info_array));
+
+	func_info_array->capacity = FUNC_INFO_INIT_CAP;
+	func_info_array->size = 0;
+	func_info_array->data = malloc(sizeof(FuncInfo)*FUNC_INFO_INIT_CAP);
+
+	return func_info_array;
+}
+
+void free_func_info_array(FuncInfoArr *func_info_array)
+{
+	free(func_info_array->data);
+	free(func_info_array);
+}
+
+FuncInfo *get_func_info_by_usr(FuncInfoArr *func_info_array, char *usr) {
+	for (size_t i = 0; i < func_info_array->size; ++i) {
+		if (strcmp(func_info_array->data[i].usr, usr) == 0)
+			return &func_info_array->data[i];
+	}
+	return get_null_func_info();
+}
+
 void print_func_info_array(FuncInfoArr *func_info_array, int depth)
 {
 	for (size_t i = 0; i < func_info_array->size; ++i) {
@@ -112,23 +154,4 @@ FuncInfo *func_info_array_tail(FuncInfoArr *func_info_array)
 {
 	size_t tail_idx = func_info_array->size-1;
 	return &func_info_array->data[tail_idx];
-}
-
-FuncInfoArr *init_func_info_array()
-{
-	
-	FuncInfoArr *func_info_array;
-	func_info_array = malloc(sizeof(*func_info_array));
-
-	func_info_array->capacity = FUNC_INFO_INIT_CAP;
-	func_info_array->size = 0;
-	func_info_array->data = malloc(sizeof(FuncInfo)*FUNC_INFO_INIT_CAP);
-
-	return func_info_array;
-}
-
-void free_func_info_array(FuncInfoArr *func_info_array)
-{
-	free(func_info_array->data);
-	free(func_info_array);
 }

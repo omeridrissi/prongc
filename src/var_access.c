@@ -2,7 +2,7 @@
 #include "log.h"
 
 VarAccess *init_var_access(const char *usr, const char *name,
-			   const char *esc_func_name,
+			   const char *esc_func_usr,
 			   int line, int column, VarAccessType type)
 {
 	VarAccess *var_access;
@@ -18,10 +18,10 @@ VarAccess *init_var_access(const char *usr, const char *name,
 	var_access->column = column;
 	var_access->type = type;
 
-	if (esc_func_name != NULL)
-		var_access->esc_func_name = strdup(esc_func_name);
+	if (esc_func_usr != NULL)
+		var_access->esc_func_usr = strdup(esc_func_usr);
 	else
-		var_access->esc_func_name = NULL;
+		var_access->esc_func_usr = NULL;
 
 	return var_access;
 }
@@ -30,8 +30,8 @@ void free_var_access(VarAccess *var_access)
 {
 	free(var_access->usr);
 	free(var_access->name);
-	if (var_access->esc_func_name)
-		free(var_access->esc_func_name);
+	if (var_access->esc_func_usr)
+		free(var_access->esc_func_usr);
 
 	free(var_access);
 }
@@ -56,11 +56,11 @@ void free_var_access_array(VarAccessArr *var_access_array)
 
 void push_var_access(VarAccessArr *var_access_array,
 			const char *usr, const char *name, 
-			const char *esc_func_name, int line,
+			const char *esc_func_usr, int line,
 			int column, VarAccessType type)
 {
 	VarAccess *var_access = init_var_access(usr, name, 
-						esc_func_name, line,
+						esc_func_usr, line,
 						column, type);
 
 	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
@@ -103,6 +103,13 @@ void print_var_access(VarAccess *var_access, int indentation)
 		case VarAccess_Escape:
 			printf("passed to function as parameter\n");
 			break;
+		case VarAccess_Null:
+			printf("NULL\n");
+			break;
+	}
+	if (var_access->esc_func_usr) {
+		printf("%*s|   esc func usr: %s\n", x, "", var_access->esc_func_usr);
+		printf("%*s|   esc param idx: %zu\n", x, "", var_access->esc_param_idx);
 	}
 }
 

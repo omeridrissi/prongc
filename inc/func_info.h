@@ -11,11 +11,16 @@
 extern bool arg_verbose;
 extern bool arg_help;
 
+extern FuncInfo empty_func_info_global;
+
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
 			 const char *elem_name,
 			 bool in_system_header);
 void free_func_info(FuncInfo *func_info);
+
+FuncInfo *get_null_func_info();
+bool func_info_is_null(FuncInfo *func_info);
 
 void push_func_info(FuncInfoArr *func_info_array,
 		    CXCursor *cursor,
@@ -23,11 +28,15 @@ void push_func_info(FuncInfoArr *func_info_array,
 		    const char *elem_name,
 		    bool in_system_header);
 
-FuncInfo *func_info_array_tail(FuncInfoArr *func_info_array);
-FuncInfo *func_info_array_head(FuncInfoArr *func_info_array);
-
 void print_func_info(FuncInfo *func_info, int indentation);
-void print_func_info_array(FuncInfoArr *func_info_array, int depth);
 
 FuncInfoArr *init_func_info_array();
 void free_func_info_array(FuncInfoArr *func_info_array);
+
+FuncInfo *get_func_info_by_usr(FuncInfoArr *func_info_array, char *usr);
+
+void print_func_info_array(FuncInfoArr *func_info_array, int indentation);
+
+FuncInfo *func_info_array_tail(FuncInfoArr *func_info_array);
+FuncInfo *func_info_array_head(FuncInfoArr *func_info_array);
+

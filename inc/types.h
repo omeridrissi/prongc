@@ -30,6 +30,8 @@ typedef enum {
 				// to function that we may or may not be able to 
 				// recurse through,
 				// and variable is a pointer or struct.
+	VarAccess_Null,		// This is for when we don't need the struct
+				// anymore so we null it out
 } VarAccessType;
 
 /* Struct that will represent a single
@@ -37,7 +39,8 @@ typedef enum {
 typedef struct {
 	char		*usr;
 	char		*name;
-	char		*esc_func_name; // Only if type is VarAccess_Escape
+	char		*esc_func_usr; // Only if passed to function
+	size_t		esc_param_idx; // Paremeter idx when passed to func
 	int		line;
 	int		column;
 	VarAccessType	type;

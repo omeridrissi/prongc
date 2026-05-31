@@ -183,7 +183,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		    closest_callexpr_offset < closest_arrsubexp_offset) {
 			CXType referenced_type = clang_getCursorType(current_cursor);
 			CXCursor callexpr_decl = clang_getCursorReferenced(closest_callexpr_ancestor);
-			CXString callexpr_name = clang_getCursorDisplayName(callexpr_decl);
+			CXString callexpr_usr = clang_getCursorUSR(callexpr_decl);
 			
 			if (closest_unop_offset < closest_callexpr_offset &&
 			    closest_unop_offset < closest_arrsubexp_offset) {
@@ -195,7 +195,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					push_var_access(current_func->var_accesses,
 							clang_getCString(decl_usr),
 							clang_getCString(decl_name),
-							clang_getCString(callexpr_name), 
+							clang_getCString(callexpr_usr), 
 							current_line, 
 							current_column, 
 							VarAccess_Escape);
@@ -205,7 +205,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					push_var_access(current_func->var_accesses,
 							clang_getCString(decl_usr),
 							clang_getCString(decl_name),
-							NULL, current_line, current_column, 
+							clang_getCString(callexpr_usr), 
+							current_line, current_column, 
 							VarAccess_Read);
 				}
 			} else if (referenced_type.kind == CXType_Pointer) {
@@ -213,7 +214,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						clang_getCString(callexpr_name), 
+						clang_getCString(callexpr_usr), 
 						current_line, 
 						current_column, 
 						VarAccess_Escape);
@@ -223,10 +224,11 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						NULL, current_line, current_column, 
+						clang_getCString(callexpr_usr), 
+						current_line, current_column, 
 						VarAccess_Read);
 			}
-			clang_disposeString(callexpr_name);
+			clang_disposeString(callexpr_usr);
 			goto visitor_recurse;
 		}
 
@@ -456,6 +458,11 @@ void process_func_info(FuncInfo *func_info,
 	client_data->current_func = prev_func_info;
 }
 
+void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_access)
+{
+	print_var_access(var_access, 0);
+}
+
 /* Maps all escaped variables and parameters to their
  * callee's variable accesses and nulls out unnecessary
  * VarAccess structs (like those of pointer type variables 
@@ -465,6 +472,37 @@ void process_func_info(FuncInfo *func_info,
 void unwind_func_info(FuncInfo *func_info,
 			struct prong_priv *client_data)
 {
+
+	VarAccessArr *var_accesses = func_info->var_accesses;
+	// Resolve var to param aliases for this FuncInfo
+	for (size_t i = 0; i < var_accesses->size; ++i) {
+		VarAccess *var_access = &var_accesses->data[i];
+		if(var_access->type == VarAccess_Escape) {
+			// Go into callee parameters and replace
+			// var access USR, names etc.
+			FuncInfo *esc_func_info = get_func_info_by_usr(func_info->callees,
+								       var_access->esc_func_usr);
+			if (!func_info_is_null(esc_func_info))
+				resolve_var_access_alias(esc_func_info, var_access);
+		}
+	}
+
+	// Null out irrelevant var accesses
+	for (size_t i = 0; i < var_accesses->size; ++i) {
+		VarAccess *var_access = &var_accesses->data[i];
+		if (/* var access usr is in locals but never escapes */
+		    var_access->type != VarAccess_Escape && 
+		    aos_contains_string(func_info->locals, var_access->usr)) {
+			var_access->type = VarAccess_Null;
+		}
+
+		if (/* var access usr is in params and is normal read/write */
+		    (var_access->type == VarAccess_Read || var_access->type == VarAccess_Write) &&
+		    aos_contains_string(func_info->params, var_access->usr)) {
+			var_access->type = VarAccess_Null;
+		}
+	}
+	
 	if (func_info->callees) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
 			unwind_func_info(&func_info->callees->data[i],
