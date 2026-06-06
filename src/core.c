@@ -180,7 +180,19 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					  &current_line, &current_column);
 		
 		CXType referenced_type = clang_getCursorType(referenced_cursor);
-		bool is_ptr_type = (referenced_type.kind == CXType_Pointer);
+		bool is_ptr_type;
+
+		switch (referenced_type.kind) {
+			case CXType_Pointer:
+			case CXType_ConstantArray:
+			case CXType_IncompleteArray:
+			case CXType_VariableArray:
+				is_ptr_type = true;
+				break;
+			default:
+				is_ptr_type = false;
+				break;
+		}
 
 		if (closest_callexpr_offset < closest_binop_offset &&
 		    closest_callexpr_offset < closest_arrsubexp_offset) {
@@ -545,7 +557,7 @@ void unwind_func_info(FuncInfo *func_info,
 		if (/* var access usr is in locals but never escapes */
 		    !var_access->is_ptr_type &&
 		    var_access->type != VarAccess_Escape &&
-		    aos_contains_string(func_info->locals, var_access->usr)) {
+	aos_contains_string(func_info->locals, var_access->usr)) {
 			var_access->type = VarAccess_Null;
 		}
 
@@ -561,6 +573,17 @@ void unwind_func_info(FuncInfo *func_info,
 			unwind_func_info(&func_info->callees->data[i],
 					 client_data);
 		}
+	}
+}
+
+void trace_va_overlap(FuncInfoArr *func_info_arr, DynamicAOS call_trace) {
+	for (size_t i = 0; i < func_info_arr->size; ++i) {
+		if (func_info_arr->data[i].callees)
+			trace_va_overlap(func_info_arr->data[i].callees, call_trace);
+
+		FuncInfo *working_func_info = &func_info_arr->data[i];
+
+		
 	}
 }
 
