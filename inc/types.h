@@ -44,6 +44,7 @@ typedef struct {
 	int		line;
 	int		column;
 	VarAccessType	type;
+	bool		is_ptr_type;
 } VarAccess;
 
 typedef struct {

@@ -6,7 +6,8 @@
 
 VarAccess *init_var_access(const char *usr, const char *name,
 			   const char *esc_func_usr, size_t esc_param_idx,
-			   int line, int column, VarAccessType type)
+			   int line, int column, VarAccessType type,
+			   bool is_ptr_type)
 {
 	VarAccess *var_access;
 	var_access = malloc(sizeof(*var_access));
@@ -27,6 +28,8 @@ VarAccess *init_var_access(const char *usr, const char *name,
 		var_access->esc_func_usr = strdup(esc_func_usr);
 	else
 		var_access->esc_func_usr = NULL;
+
+	var_access->is_ptr_type = is_ptr_type;
 
 	return var_access;
 }
@@ -62,12 +65,13 @@ void free_var_access_array(VarAccessArr *var_access_array)
 void push_var_access(VarAccessArr *var_access_array,
 			const char *usr, const char *name, 
 			const char *esc_func_usr, size_t esc_param_idx, 
-			int line, int column, VarAccessType type)
+			int line, int column, VarAccessType type,
+			bool is_ptr_type)
 {
 	VarAccess *var_access = init_var_access(usr, name, 
 						esc_func_usr, 
 						esc_param_idx, line,
-						column, type);
+						column, type, is_ptr_type);
 
 	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
 		var_access_array->capacity *= 2;
@@ -118,6 +122,11 @@ void print_var_access(VarAccess *var_access, int indentation)
 	
 	if (var_access->esc_param_idx != NO_IDX)
 		printf("%*s|   esc param idx: %zu\n", x, "", var_access->esc_param_idx);
+
+	if (var_access->is_ptr_type) 
+		printf("%*s|   *is pointer\n", x, "");
+	else
+		printf("%*s|   *not pointer\n", x, "");
 	
 }
 
