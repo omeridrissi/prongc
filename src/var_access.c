@@ -1,8 +1,11 @@
+#include <stdint.h>
 #include "var_access.h"
 #include "log.h"
 
+#define NO_IDX SIZE_MAX
+
 VarAccess *init_var_access(const char *usr, const char *name,
-			   const char *esc_func_usr,
+			   const char *esc_func_usr, size_t esc_param_idx,
 			   int line, int column, VarAccessType type)
 {
 	VarAccess *var_access;
@@ -17,6 +20,8 @@ VarAccess *init_var_access(const char *usr, const char *name,
 	var_access->line = line;
 	var_access->column = column;
 	var_access->type = type;
+
+	var_access->esc_param_idx = esc_param_idx;
 
 	if (esc_func_usr != NULL)
 		var_access->esc_func_usr = strdup(esc_func_usr);
@@ -56,11 +61,12 @@ void free_var_access_array(VarAccessArr *var_access_array)
 
 void push_var_access(VarAccessArr *var_access_array,
 			const char *usr, const char *name, 
-			const char *esc_func_usr, int line,
-			int column, VarAccessType type)
+			const char *esc_func_usr, size_t esc_param_idx, 
+			int line, int column, VarAccessType type)
 {
 	VarAccess *var_access = init_var_access(usr, name, 
-						esc_func_usr, line,
+						esc_func_usr, 
+						esc_param_idx, line,
 						column, type);
 
 	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
@@ -107,10 +113,12 @@ void print_var_access(VarAccess *var_access, int indentation)
 			printf("NULL\n");
 			break;
 	}
-	if (var_access->esc_func_usr) {
+	if (var_access->esc_func_usr) 
 		printf("%*s|   esc func usr: %s\n", x, "", var_access->esc_func_usr);
+	
+	if (var_access->esc_param_idx != NO_IDX)
 		printf("%*s|   esc param idx: %zu\n", x, "", var_access->esc_param_idx);
-	}
+	
 }
 
 void print_var_access_array(VarAccessArr *var_access_array, int indentation) 

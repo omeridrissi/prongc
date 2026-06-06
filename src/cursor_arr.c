@@ -49,7 +49,7 @@ static enum CXChildVisitResult in_cursor_branch_visitor(CXCursor cursor,
 {
 	(void)parent; // Casted to void cuz unused
 	CursorBoolPair *pair = (CursorBoolPair*)data;
-	if (clang_equalCursors(cursor, pair->cursor)) {
+	if (cursors_are_equal(cursor, pair->cursor)) {
 		pair->boolean = true;
 		return CXChildVisit_Break;
 	}
@@ -221,6 +221,19 @@ CXCursor get_cursor_by_offset(CXCursorArr *stack, size_t offset)
 /* Get the top of the cursor stack or 'tail' of cursor array */
 CXCursor get_cursor_array_tail(CXCursorArr *cursor_array) {
 	return cursor_array->data[cursor_array->size-1];
+}
+
+size_t get_param_idx(CXCursor call_expr, 
+		     CXCursorArr *stack) 
+{
+	size_t num_args = (size_t)clang_Cursor_getNumArguments(call_expr);
+	for (size_t i = 0; i < num_args; ++i) {
+		CXCursor arg = clang_Cursor_getArgument(call_expr, i);
+		if (in_cursor_stack(stack, arg)) {
+			return i;
+		}
+	}
+	return NO_IDX;
 }
 
 void print_cursor(CXCursor cursor) 

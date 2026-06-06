@@ -7,7 +7,8 @@
 #include "types.h"
 
 #define CURSOR_ARR_INIT_CAP 8
-#define ANCESTOR_NOT_FOUND SIZE_MAX
+#define ANCESTOR_NOT_FOUND	SIZE_MAX
+#define NO_IDX			SIZE_MAX
 
 typedef struct {
 	CXCursor cursor;
@@ -37,6 +38,8 @@ size_t		get_binop_assignment_offset(CXCursorArr *stack);
 CXCursor	get_cursor_by_offset(CXCursorArr *stack, size_t offset);
 
 CXCursor	get_cursor_array_tail(CXCursorArr *cursor_array);
+
+size_t get_param_idx(CXCursor call_expr, CXCursorArr *stack);
 
 void		print_cursor(CXCursor cursor);
 void		print_cursor_array(CXCursorArr *cursor_array);
