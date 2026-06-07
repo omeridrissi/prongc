@@ -71,6 +71,9 @@ struct FuncInfo {
 	DynamicAOS	*params;// USRs of parameters
 	DynamicAOS	*locals;// USRs for local VarDecls
 	
+	VarAccessArr	*access_footprint; // All non-nullified VarAccesses
+					   // including callee variable accesses in order
+	
 	/* For dependency tracking */
 	FuncInfoArr	*callees;
 

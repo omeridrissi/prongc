@@ -137,9 +137,9 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 	// of pushed cursors, the 
 	if (current_cursor_kind == CXCursor_DeclRefExpr) {
 		FuncInfo *current_func = prong_priv->current_func;
+	
 		if (!current_func->var_accesses)
 			current_func->var_accesses = init_var_access_array();
-		
 		//CXCursor parent_cursor = clang_getCursorLexicalParent(current_cursor);
 		/* Check if this is an assignment */
 		//enum CXCursorKind refexpr_parent_kind = clang_getCursorKind(parent_cursor);
@@ -557,7 +557,7 @@ void unwind_func_info(FuncInfo *func_info,
 		if (/* var access usr is in locals but never escapes */
 		    !var_access->is_ptr_type &&
 		    var_access->type != VarAccess_Escape &&
-	aos_contains_string(func_info->locals, var_access->usr)) {
+		    aos_contains_string(func_info->locals, var_access->usr)) {
 			var_access->type = VarAccess_Null;
 		}
 
@@ -576,13 +576,35 @@ void unwind_func_info(FuncInfo *func_info,
 	}
 }
 
+/* Collect all VarAccess structs that weren't nullified
+ * into the root FuncInfo's top level footprint collection
+ * of all variable accesses at func_info->access_footprint */
+void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint) {
+	if (func_info->callees) {
+		for (size_t i = 0; i < func_info->callees->size; ++i) {
+			build_var_access_footprint(&func_info->callees->data[i],
+						   access_footprint);
+		}
+	}
+
+	for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
+		
+		VarAccess *working_va = &func_info->var_accesses->data[i];
+	
+		if (working_va->type != VarAccess_Null) 
+			push_access_copy(access_footprint, working_va);
+	}
+}
+
+/* Goes through FuncInfos recursively and prints out
+ * call traces to variable accesses that overlap between
+ * functions */
 void trace_va_overlap(FuncInfoArr *func_info_arr, DynamicAOS call_trace) {
 	for (size_t i = 0; i < func_info_arr->size; ++i) {
 		if (func_info_arr->data[i].callees)
 			trace_va_overlap(func_info_arr->data[i].callees, call_trace);
 
 		FuncInfo *working_func_info = &func_info_arr->data[i];
-
 		
 	}
 }
@@ -596,7 +618,7 @@ struct prong_priv *prong_init_priv()
 	struct prong_priv *prong_priv;
 
 	prong_priv = malloc(sizeof(*prong_priv));
-	if (!prong_priv) 
+	if (!prong_priv)
 		goto exit;
 
 	memset(prong_priv, '\0', sizeof(struct prong_priv));
@@ -610,7 +632,6 @@ struct prong_priv *prong_init_priv()
 
 	prong_priv->funcs = init_func_info_array();
 	prong_priv->touched_func_usrs = init_aos();
-
 
 	return prong_priv;
 

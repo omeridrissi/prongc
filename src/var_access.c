@@ -88,6 +88,20 @@ void push_var_access(VarAccessArr *var_access_array,
 
 }
 
+void push_access_copy(VarAccessArr *var_access_array, VarAccess *var_access)
+{
+	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
+		var_access_array->capacity *= 2;
+		var_access_array->data = reallocarray(var_access_array->data,
+						var_access_array->capacity,
+						sizeof(VarAccess));
+	}
+
+	memcpy(var_access_array->data+var_access_array->size,
+			var_access, sizeof(VarAccess));
+	var_access_array->size++;
+}
+
 void print_var_access(VarAccess *var_access, int indentation)
 {
 	int x = indentation*3;
