@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include "core.h"
 #include "dyn_aos.h"
 #include "func_info.h"
@@ -22,37 +23,70 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	struct prong_priv *prong_priv = (struct prong_priv *)client_data;
 
 	CXString parent_display_name = clang_getCursorDisplayName(parent_cursor);
-	
+	CXString parent_spelling = clang_getCursorSpelling(parent_cursor);
+
 	enum CXCursorKind current_cursor_kind = clang_getCursorKind(current_cursor);
 	enum CXCursorKind parent_cursor_kind = clang_getCursorKind(parent_cursor);
 
-	const char *elem_name = clang_getCString(parent_display_name);
+	const char *elem_spelling = clang_getCString(parent_spelling);
 
 	/* Collects function declaration cursors */
 	if ((current_cursor_kind == CXCursor_CompoundStmt) &&
 	    (parent_cursor_kind == CXCursor_FunctionDecl)) {
 		
-		if (aos_contains_string(prong_priv->func_names, elem_name)) {
-			CXString cursor_usr = clang_getCursorUSR(parent_cursor);
-			if (arg_verbose) {
-				print_verbose("Visiting element %s\n", 
-					      clang_getCString(parent_display_name));
-				print_verbose("	kind: %d\n", 
-					      clang_getCursorKind(parent_cursor));
-				print_verbose("	unified symbol representation: %s\n", 
-					      clang_getCString(cursor_usr));
+		for (size_t i = 0; i < prong_priv->func_names->count; ++i) {
+			const char *func_name = aos_string_at(prong_priv->func_names, i);
+			DynamicAOS *parsed_func_name = init_aos();
 
-			}
+			parse_func_call(func_name, parsed_func_name);
 			
-			push_func_info(prong_priv->funcs,
-					&parent_cursor,
-					clang_getCString(cursor_usr),
-					clang_getCString(parent_display_name),
-					false);
-
-			clang_disposeString(cursor_usr);
+			if (strcmp(parsed_func_name->data, elem_spelling) == 0) {
+				CXString cursor_usr = clang_getCursorUSR(parent_cursor);
+				if (arg_verbose) {
+					print_verbose("Visiting element %s\n", 
+						      clang_getCString(parent_display_name));
+					print_verbose("	kind: %d\n", 
+						      clang_getCursorKind(parent_cursor));
+					print_verbose("	unified symbol representation: %s\n", 
+						      clang_getCString(cursor_usr));
+	
+				}
+				
+				push_func_info(prong_priv->funcs,
+						&parent_cursor,
+						clang_getCString(cursor_usr),
+						clang_getCString(parent_display_name),
+						false);
+	
+				clang_disposeString(cursor_usr);
+			}
+		
+			free_aos(parsed_func_name);
 		}
+
+		//if (aos_contains_string(prong_priv->func_names, elem_name)) {
+		//	CXString cursor_usr = clang_getCursorUSR(parent_cursor);
+		//	if (arg_verbose) {
+		//		print_verbose("Visiting element %s\n", 
+		//			      clang_getCString(parent_display_name));
+		//		print_verbose("	kind: %d\n", 
+		//			      clang_getCursorKind(parent_cursor));
+		//		print_verbose("	unified symbol representation: %s\n", 
+		//			      clang_getCString(cursor_usr));
+
+		//	}
+		//	
+		//	push_func_info(prong_priv->funcs,
+		//			&parent_cursor,
+		//			clang_getCString(cursor_usr),
+		//			clang_getCString(parent_display_name),
+		//			false);
+
+		//	clang_disposeString(cursor_usr);
+		//}
 		clang_disposeString(parent_display_name);
+		clang_disposeString(parent_spelling);
+		
 		return CXChildVisit_Continue;
 	}
 
@@ -71,11 +105,13 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 			clang_disposeString(cursor_usr);
 		}
 		clang_disposeString(parent_display_name);
+		clang_disposeString(parent_spelling);
 
 		return CXChildVisit_Continue;
 	}
 
 	clang_disposeString(parent_display_name);
+	clang_disposeString(parent_spelling);
 
 	return CXChildVisit_Recurse;
 }
@@ -256,11 +292,13 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			// Check if our cursor is on the rhs or lhs of 
 			// the ArraySubscriptExpr
 			CXCursor arrsubexp_lhs = get_cursor_first_child(closest_arrsubexp_ancestor);
-			if (in_cursor_stack(prong_priv->ancestry_stack, arrsubexp_lhs)) {
+			if (cursors_are_equal(current_cursor, arrsubexp_lhs) || 
+			    in_cursor_stack(prong_priv->ancestry_stack, arrsubexp_lhs)) {
 				// Check if it's on lhs of binary operator
 				if (closest_binop_offset != ANCESTOR_NOT_FOUND) {
 					CXCursor binop_lhs = get_cursor_first_child(closest_binop_ancestor);
-					if (in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
+					if (cursors_are_equal(current_cursor, binop_lhs) ||
+					    in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
 						// Push as write
 						push_var_access(current_func->var_accesses,
 								clang_getCString(decl_usr),
@@ -302,8 +340,10 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					CXCursor non_assign_binop_lhs =
 						get_cursor_first_child(non_assign_binop_ancestor);
 					// Push as write if LHS
-					if (in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
-						if (in_cursor_stack(prong_priv->ancestry_stack, 
+					if (cursors_are_equal(current_cursor, binop_lhs) || 
+					    in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
+						if (cursors_are_equal(current_cursor, binop_lhs) ||
+						    in_cursor_stack(prong_priv->ancestry_stack, 
 									non_assign_binop_lhs)) {
 							push_var_access(current_func->var_accesses,
 									clang_getCString(decl_usr),
@@ -363,7 +403,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			CXCursor binop_lhs = get_cursor_first_child(closest_binop_ancestor);
 			
 			// Push as write if LHS
-			if (in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
+			if (cursors_are_equal(current_cursor, binop_lhs) ||
+			    in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
 				// Push as write
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
@@ -526,6 +567,35 @@ static void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_acc
 	clang_disposeString(param_usr);
 }
 
+// This function was made with by deepseek
+/* Generate an artificial USR that's distinct from the usual
+ * USR format but unique enough to compare to libclang USRs */
+static char *generate_artificial_param_usr(const char *name, size_t param_idx)
+{
+	const char *safe_name = name ? name : "";
+
+	size_t name_len = strlen(safe_name);
+
+	unsigned hash = 5381;
+	for (size_t i = 0; i < name_len; ++i) {
+		hash = ((hash << 5) + hash) + (unsigned char)safe_name[i];
+	}
+
+	// Format: p:<index>:<hash>:<namelen>:<name>
+	size_t buffer_size = 48 + name_len;
+	char *usr = (char*)malloc(buffer_size);
+	if (!usr) return NULL;
+
+	if (name_len > 0) {
+		snprintf(usr, buffer_size, "p:%zu:%u:%zu:%s", param_idx,
+				hash, name_len, safe_name);
+	} else {
+		snprintf(usr, buffer_size, "p:%zu:unnamed", param_idx);
+	}
+
+	return usr;
+}
+
 /* Maps all escaped variables and parameters to their
  * callee's variable accesses and nulls out unnecessary
  * VarAccess structs (like those of pointer type variables 
@@ -533,10 +603,31 @@ static void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_acc
  * - definition of escaped variables in
  * types.h VarAccessType enum definition*/
 void unwind_func_info(FuncInfo *func_info,
-			struct prong_priv *client_data)
+			struct prong_priv *client_data,
+			DynamicAOS *parsed_func_call)
 {
-
 	VarAccessArr *var_accesses = func_info->var_accesses;
+
+	// If we have a parsed function call, we're at the root function so
+	// we "map" our inputted arguments to our "parameter" variable accesses
+	// with an artificially generated "USR" 
+	if (parsed_func_call != NULL) {
+		for (size_t i = 1; i < parsed_func_call->count; ++i) {
+			const char *param_usr = aos_string_at(func_info->params, i-1);
+
+			for (size_t j = 0; j < var_accesses->size; ++j) {
+				VarAccess *var_access = &var_accesses->data[j];
+				if (strcmp(var_access->usr, param_usr) == 0) {
+					const char *parsed_arg = aos_string_at(parsed_func_call, i);
+				
+					free(var_access->usr);
+					var_access->usr = generate_artificial_param_usr(parsed_arg, i-1);
+				}
+			}
+
+		}
+	}
+
 	// Resolve var to param aliases for this FuncInfo
 	if (func_info->callees) {
 		for (size_t i = 0; i < var_accesses->size; ++i) {
@@ -568,10 +659,11 @@ void unwind_func_info(FuncInfo *func_info,
 		}
 	}
 	
+	// Recurse
 	if (func_info->callees) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
 			unwind_func_info(&func_info->callees->data[i],
-					 client_data);
+					 client_data, NULL);
 		}
 	}
 }
@@ -588,11 +680,10 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	}
 
 	for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
-		
 		VarAccess *working_va = &func_info->var_accesses->data[i];
 	
 		if (working_va->type != VarAccess_Null) 
-			push_access_copy(access_footprint, working_va);
+			push_access_copy(access_footprint, working_va); // Problem
 	}
 }
 
@@ -664,6 +755,85 @@ void prong_free_priv(struct prong_priv *prong_priv)
 	
 }
 
+// This function was also made with deepseek
+/* Takes "input" in the format of "foo(arg1, arg2, ...)" and
+ * pushes function name, argument names in order to external
+ * DynamicAOS "out" in the format of ["foo", "arg1", "arg2", ...] */
+error_t parse_func_call(const char *input, DynamicAOS *out) {
+	if (!input || !out) return ERR_INVALID_ARG;
+	
+//	size_t len = strlen(input);
+	
+	// Find the opening paren
+	const char *paren = strchr(input, '(');
+	if (!paren) return ERR_SYNTAX;
+	
+	// Extract function name (everything before the paren)
+	// Trim trailing whitespace
+	const char *name_end = paren;
+	while (name_end > input && isspace((unsigned char)*(name_end - 1))) {
+	    name_end--;
+	}
+	
+	size_t name_len = name_end - input;
+	if (name_len == 0) return ERR_SYNTAX;
+	
+	char *func_name = strndup(input, name_len);
+	if (!func_name) return ERR_OUT_OF_MEMORY;
+	aos_push_string(out, func_name);
+	free(func_name);
+	
+	// Find the closing paren
+	const char *closing = strrchr(paren, ')');
+	if (!closing) return ERR_SYNTAX;
+	
+	// Extract arguments between parens
+	const char *args_start = paren + 1;
+	const char *args_end = closing;
+	
+	// Parse comma-separated arguments
+	const char *cursor = args_start;
+	while (cursor < args_end) {
+	    // Skip leading whitespace
+	    while (cursor < args_end && isspace((unsigned char)*cursor)) {
+	        cursor++;
+	    }
+	    if (cursor >= args_end) break;
+	    
+	    // Find end of this argument (comma or closing paren)
+	    const char *arg_start = cursor;
+	    const char *arg_end = cursor;
+	    int depth = 0;  // Track nested parens for function pointer args
+	    
+	    while (cursor < args_end) {
+	        if (*cursor == '(') depth++;
+	        else if (*cursor == ')') depth--;
+	        else if (*cursor == ',' && depth == 0) break;
+	        cursor++;
+	    }
+	    arg_end = cursor;
+	    
+	    // Trim trailing whitespace from argument
+	    while (arg_end > arg_start && isspace((unsigned char)*(arg_end - 1))) {
+	        arg_end--;
+	    }
+	    
+	    if (arg_end > arg_start) {
+	        char *arg = strndup(arg_start, arg_end - arg_start);
+	        if (!arg) return ERR_OUT_OF_MEMORY;
+	        aos_push_string(out, arg);
+	        free(arg);
+	    }
+	    
+	    // Skip the comma
+	    if (cursor < args_end && *cursor == ',') {
+	        cursor++;
+	    }
+	}
+	
+	return ERR_OK;
+}
+
 /* Turns comma-separated strings into a 
  * dynamic string array DynamicAOS */
 static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
@@ -724,7 +894,7 @@ error_t process_args(int argc, char **argv,
 }
 
 void print_usage(const char *prog_name) {
-    printf("Usage: %s --files=\"file1;file2;...\" --functions=\"func1;func2;...\" [OPTIONS]\n", prog_name);
+    printf("Usage: %s --files=\"file1;file2;...\" --functions=\"func1(arg1, arg2);func2(arg1, arg2);...\" [OPTIONS]\n", prog_name);
     printf("\n");
     printf("Required arguments:\n");
     printf("  --files=LIST        Comma-separated list of input source files\n");

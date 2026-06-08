@@ -7,6 +7,7 @@
 #include "dyn_aos.h"
 #include "func_info.h"
 #include "cursor_arr.h"
+#include "var_access.h"
 #include "log.h"
 
 bool arg_verbose = false;
@@ -32,6 +33,12 @@ int main(int argc, char **argv)
 	// Initializes some fields in client_data
 	ret = process_args(argc, argv, client_data);
 	if (ret) {
+		print_usage(argv[0]);
+		goto free_priv;
+	}
+
+	if (client_data->func_names->count < 2) {
+		print_error("Need multiple functions for variable overlap tracing\n");
 		print_usage(argv[0]);
 		goto free_priv;
 	}
@@ -128,7 +135,14 @@ int main(int argc, char **argv)
 	//}
 
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
-		unwind_func_info(&client_data->funcs->data[i], client_data);
+		const char *func_call = aos_string_at(client_data->func_names, i);
+		DynamicAOS *parsed_func_call = init_aos();
+
+		parse_func_call(func_call, parsed_func_call);
+		
+		unwind_func_info(&client_data->funcs->data[i], client_data, parsed_func_call);
+
+		free_aos(parsed_func_call);
 	}
 
 	if (arg_verbose) {
@@ -138,6 +152,18 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		print_func_info_array(client_data->funcs, 0);
+	}
+	
+	for (size_t i = 0; i < client_data->funcs->size; ++i) {
+		FuncInfo *working_func_info = &client_data->funcs->data[i];
+		working_func_info->access_footprint = init_var_access_array();
+
+		build_var_access_footprint(working_func_info,
+					   working_func_info->access_footprint);
+	}
+
+	for (size_t i = 0; i < client_data->funcs->size; ++i) {
+		print_var_access_array(client_data->funcs->data[i].access_footprint, 0);
 	}
 
 free_tu_array:

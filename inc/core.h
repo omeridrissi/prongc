@@ -18,10 +18,15 @@ void process_tu_array(CXTranslationUnit *tu_array,
 void process_func_info(FuncInfo *func_info,
 			struct prong_priv *client_data);
 void unwind_func_info(FuncInfo *func_info,
-			struct prong_priv *client_data);
+			struct prong_priv *client_data,
+			DynamicAOS *parsed_func_call);
+
+void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint);
 
 struct prong_priv *prong_init_priv();
 void prong_free_priv(struct prong_priv *prong_priv);
+
+error_t parse_func_call(const char *input, DynamicAOS *out);
 
 error_t process_args(int argc, char **argv, 
 		     struct prong_priv *prong_priv);
