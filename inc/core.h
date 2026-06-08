@@ -23,6 +23,10 @@ void unwind_func_info(FuncInfo *func_info,
 
 void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint);
 
+void trace_va_overlap(FuncInfo *func_info,
+		      VarAccess *var_access,
+		      DynamicAOS *call_trace);
+
 struct prong_priv *prong_init_priv();
 void prong_free_priv(struct prong_priv *prong_priv);
 

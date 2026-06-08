@@ -21,8 +21,10 @@ void		push_var_access(VarAccessArr *var_access_array,
 
 void		push_access_copy(VarAccessArr *var_access_array, VarAccess *var_access);
 
-void print_var_access(VarAccess *var_access, 
-		      int indentation);
-void print_var_access_array(VarAccessArr *var_access_array, 
-			    int indentation);
+bool		equal_var_accesses(VarAccess *va_a, VarAccess *va_b);
+
+void		print_var_access(VarAccess *var_access, 
+				 int indentation);
+void		print_var_access_array(VarAccessArr *var_access_array, 
+				       int indentation);
 

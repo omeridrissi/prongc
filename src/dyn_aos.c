@@ -77,7 +77,6 @@ error_t aos_pop_string(DynamicAOS *array) {
 		return ERR_AOS_EMPTY;
 	
 	const char *last_str = aos_string_at(array, array->count-1);
-	printf("Got here!\n");	
 	size_t last_str_size = strlen(last_str)+1;
 
 	array->size -= last_str_size;

@@ -39,8 +39,28 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 			DynamicAOS *parsed_func_name = init_aos();
 
 			parse_func_call(func_name, parsed_func_name);
-			
+
 			if (strcmp(parsed_func_name->data, elem_spelling) == 0) {
+				size_t num_args = (size_t)clang_Cursor_getNumArguments(parent_cursor);
+
+				if (num_args > parsed_func_name->count-1) {
+					print_error("too few arguments to function %s, expected %zu, have %zu\n", 
+							parsed_func_name->strings[0], 
+							num_args, 
+							parsed_func_name->count-1);
+					free_aos(parsed_func_name);
+					continue;
+				} 
+
+				if (num_args < parsed_func_name->count-1) {
+					print_error("too many arguments to function %s, expected %zu, have %zu\n", 
+							parsed_func_name->strings[0], 
+							num_args, 
+							parsed_func_name->count-1);
+					free_aos(parsed_func_name);
+					continue;
+				}
+
 				CXString cursor_usr = clang_getCursorUSR(parent_cursor);
 				if (arg_verbose) {
 					print_verbose("Visiting element %s\n", 
@@ -683,9 +703,45 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 		VarAccess *working_va = &func_info->var_accesses->data[i];
 	
-		if (working_va->type != VarAccess_Null) 
+		if (working_va->type != VarAccess_Null &&
+		    working_va->type != VarAccess_Escape) 
 			push_access_copy(access_footprint, working_va); 
 	}
+}
+
+static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
+{
+	for (size_t i = 0; i < call_trace->count; ++i) {
+		printf("%s -> ", call_trace->strings[i]);
+	}
+	printf("line: %d, column: %d \n\t", var_access->line, var_access->column);
+
+	switch (var_access->type) {
+		case VarAccess_Read:
+			printf("READ: ");
+			break;
+		case VarAccess_Write:
+			printf("WRITE: ");
+			break;
+		case VarAccess_PtrRead:
+			printf("READ FROM ADDR: ");
+			break;
+		case VarAccess_PtrWrite:
+			printf("WRITE TO ADDR: ");
+			break;
+		case VarAccess_Escape:
+			printf("escaped (possibly bug): ");
+			break;
+		case VarAccess_Null:
+			printf("NULL: ");
+			break;
+	}
+
+	printf("%s ", var_access->name);
+	if (var_access->is_ptr_type)
+		printf("(ptr)\n");
+	else
+		printf("\n");
 }
 
 /* Goes in "func_info" graph recursively and tries to find
@@ -693,13 +749,13 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
  * When it finds the function, it prints out the call trace. */
 void trace_va_overlap(FuncInfo *func_info,
 		      VarAccess *var_access,
-		      DynamicAOS call_trace) 
+		      DynamicAOS *call_trace) 
 {
-	aos_push_string(call_trace, func_info->usr);
+	aos_push_string(call_trace, func_info->name);
 
 	if (func_info->var_accesses) {
 		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
-			VarAccess *working_va = func_info->var_accesses->data[i];
+			VarAccess *working_va = &func_info->var_accesses->data[i];
 			if (equal_var_accesses(var_access, working_va)) {
 				print_call_trace(var_access, call_trace);
 			}

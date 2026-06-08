@@ -145,15 +145,8 @@ int main(int argc, char **argv)
 		free_aos(parsed_func_call);
 	}
 
-	if (arg_verbose) {
-		print_verbose("showing unwinded state...\n");
-		print_verbose("global variable USRs: ");
-		aos_print_strings(client_data->global_usrs);
-		printf("\n");
-
-		print_func_info_array(client_data->funcs, 0);
-	}
-	
+	/* Build array of variable accesses that contains ALL
+	 * variable accesses recursively */
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
 		FuncInfo *working_func_info = &client_data->funcs->data[i];
 		working_func_info->access_footprint = init_var_access_array();
@@ -162,8 +155,46 @@ int main(int argc, char **argv)
 					   working_func_info->access_footprint);
 	}
 
+	// Messiest part :(
+	/* Basically checks if two FuncInfos contain the same VarAccess by
+	 * using the collection of all variable accesses from both functions 
+	 * (access_footprint)*/
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
-		print_var_access_array(client_data->funcs->data[i].access_footprint, 0);
+		for (size_t j = 0; j < client_data->funcs->size; ++j) {
+			if (i == j)
+				continue;
+
+			FuncInfo *func_info_i = &client_data->funcs->data[i];
+			FuncInfo *func_info_j = &client_data->funcs->data[j];
+
+			for (size_t k = 0; k < func_info_i->access_footprint->size; ++k) {
+				for (size_t l = 0; l < func_info_j->access_footprint->size; ++l) {
+					VarAccess *va_k = &func_info_i->access_footprint->data[k];
+					VarAccess *va_l = &func_info_j->access_footprint->data[l];
+
+					if (equal_var_accesses(va_k, va_l)) {
+						DynamicAOS *call_trace = init_aos();
+						printf("Local/Param overlap:\n");
+						trace_va_overlap(func_info_i, va_k, call_trace);
+						trace_va_overlap(func_info_j, va_l, call_trace);
+						printf("-------------------\n");
+						free_aos(call_trace);
+					}
+					
+					/* Checks globals, computationally expensive because of
+					 * string comparisons */
+					if (aos_contains_string(client_data->global_usrs, va_k->usr) &&
+					    aos_contains_string(client_data->global_usrs, va_l->usr)) {
+						DynamicAOS *call_trace = init_aos();
+						printf("Global variable overlap:\n");
+						trace_va_overlap(func_info_i, va_k, call_trace);
+						trace_va_overlap(func_info_j, va_l, call_trace);
+						printf("-----------------------\n");
+						free_aos(call_trace);
+					}
+				}
+			}
+		}
 	}
 
 free_tu_array:
