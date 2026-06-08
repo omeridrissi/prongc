@@ -10,7 +10,7 @@ make
 make clean
 
 # Run
-./build/prong --files="file1.c;file2.c;..." --functions="func1(arg1, arg2);func2(arg1, arg2);..." [OPTIONS]
+./build/prong --files="file1.c;file2.c;..." --functions="foo(arg1, arg2);bar(arg1, arg2);..." [OPTIONS]
 ```
 Command line function name format:
 
