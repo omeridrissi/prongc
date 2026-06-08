@@ -19,6 +19,7 @@ DynamicAOS *init_aos(void)
 	array_struct = malloc(sizeof(*array_struct));
 
 	array_struct->data = (char*)malloc(sizeof(char)*AOS_INITIAL_CAP);
+	array_struct->strings = (char**)malloc(sizeof(char)*AOS_MAX_STR_COUNT);
 	array_struct->capacity = AOS_INITIAL_CAP;
 	array_struct->size = 0;
 	array_struct->count = 0;
@@ -52,20 +53,37 @@ error_t aos_push_string(DynamicAOS *array, const char *str)
 	/* Bounds check. Double array size if evaluates to true */
 bounds_check:
 	if ((array->size + str_size) > array->capacity) {
-		array->data = reallocarray(array->data, 
-					   array->capacity, 
-					   sizeof(char)*2);
+		size_t new_cap = array->capacity ? array->capacity*2 : AOS_INITIAL_CAP;
+		array->data = reallocarray(array->data, new_cap, sizeof(char));
+
 		if (!array->data)
 			return ERR_OUT_OF_MEMORY;
-		array->capacity = array->capacity*2;
+
+		array->capacity = new_cap;
 		goto bounds_check;
 	}
 
 	memcpy(array->data + array->size, str, str_size);
+	array->strings[array->count] = array->data + array->size;
 	array->size += str_size;
 	array->count++;
 
-	return 0;
+	return ERR_OK;
+}
+
+/* Pop */
+error_t aos_pop_string(DynamicAOS *array) {
+	if (array->count == 0)
+		return ERR_AOS_EMPTY;
+	
+	const char *last_str = aos_string_at(array, array->count-1);
+	printf("Got here!\n");	
+	size_t last_str_size = strlen(last_str)+1;
+
+	array->size -= last_str_size;
+	array->count--;
+
+	return ERR_OK;
 }
 
 /* Returns number of tightly packed strings
@@ -79,13 +97,11 @@ ssize_t aos_string_count(DynamicAOS *array)
  * present, returns NULL otherwise */
 char *aos_find_string(DynamicAOS *array, const char *needle)
 {
-	size_t offset = 0;
-	while (offset <= array->size) {
-		char *current = array->data + offset;
+	for (size_t i = 0; i < array->count; ++i) {
+		char *current = array->strings[i];
 		if (strcmp(current, needle) == 0) {
 			return current;
 		}
-		offset += strlen(current) + 1;
 	}
 
 	return NULL;
@@ -95,13 +111,11 @@ char *aos_find_string(DynamicAOS *array, const char *needle)
  * returns false otherwise */
 bool aos_contains_string(DynamicAOS *array, const char *needle)
 {
-	size_t offset = 0;
 	for (size_t i = 0; i < array->count; ++i) {
-		const char *current = array->data+offset;
+		const char *current = array->strings[i];
 		if (strcmp(current, needle) == 0) {
 			return true;
 		}
-		offset += strlen(current) + 1;
 	}
 
 	return false;
@@ -112,15 +126,11 @@ bool aos_contains_string(DynamicAOS *array, const char *needle)
  * string is not present */
 ssize_t aos_find_string_idx(DynamicAOS *array, const char *needle)
 {
-	int idx = 0;
-	size_t offset = 0;
-	while (offset <= array->size) {
-		const char *current = array->data + offset;
-		++idx;
+	for (size_t i = 0; i < array->count; ++i) {
+		const char *current = array->strings[i];
 		if (strcmp(current, needle) == 0) {
-			return idx;
+			return i;
 		}
-		offset += strlen(current)+1;
 	}
 
 	return -1;
@@ -131,16 +141,10 @@ ssize_t aos_find_string_idx(DynamicAOS *array, const char *needle)
  * index is out of range. */
 char *aos_string_at(DynamicAOS *array, size_t idx) 
 {
-	size_t counter = 0;
-	size_t offset = 0;
-	while (offset <= array->size) {
-		const char *current = array->data + offset;
-		if (counter++ == idx)
-			return current;
-		offset += strlen(current)+1;
-	}
-
-	return NULL;
+	if (idx > array->count-1)
+		return NULL;
+	
+	return array->strings[idx];
 }
 
 /* Prints all the strings in the array */
@@ -151,15 +155,11 @@ void aos_print_strings(DynamicAOS *array)
 		return;
 	}
 	printf("[ ");
-	size_t n = array->count;
-	size_t offset = 0;
-	for (size_t i = 0; i < n; ++i) {
-		const char *current = array->data + offset;
+	for (size_t i = 0; i < array->count; ++i) {
+		const char *current = array->strings[i];
 		printf("\"");
 		printf("%s", current);
-		printf("\", ");
-		
-		offset += strlen(current)+1;
+		printf("\", ");	
 	}
 	printf("]");
 }

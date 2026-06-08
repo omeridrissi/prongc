@@ -9,6 +9,7 @@
 #include "types.h"
 
 #define AOS_INITIAL_CAP 64
+#define AOS_MAX_STR_COUNT 64
 
 DynamicAOS	*init_aos(void);
 void		free_aos(DynamicAOS *array);

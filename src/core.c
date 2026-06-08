@@ -671,7 +671,8 @@ void unwind_func_info(FuncInfo *func_info,
 /* Collect all VarAccess structs that weren't nullified
  * into the root FuncInfo's top level footprint collection
  * of all variable accesses at func_info->access_footprint */
-void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint) {
+void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint) 
+{
 	if (func_info->callees) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
 			build_var_access_footprint(&func_info->callees->data[i],
@@ -683,21 +684,35 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 		VarAccess *working_va = &func_info->var_accesses->data[i];
 	
 		if (working_va->type != VarAccess_Null) 
-			push_access_copy(access_footprint, working_va); // Problem
+			push_access_copy(access_footprint, working_va); 
 	}
 }
 
-/* Goes through FuncInfos recursively and prints out
- * call traces to variable accesses that overlap between
- * functions */
-void trace_va_overlap(FuncInfoArr *func_info_arr, DynamicAOS call_trace) {
-	for (size_t i = 0; i < func_info_arr->size; ++i) {
-		if (func_info_arr->data[i].callees)
-			trace_va_overlap(func_info_arr->data[i].callees, call_trace);
+/* Goes in "func_info" graph recursively and tries to find
+ * "var_access" struct while keeping track of it's "call_trace".
+ * When it finds the function, it prints out the call trace. */
+void trace_va_overlap(FuncInfo *func_info,
+		      VarAccess *var_access,
+		      DynamicAOS call_trace) 
+{
+	aos_push_string(call_trace, func_info->usr);
 
-		FuncInfo *working_func_info = &func_info_arr->data[i];
-		
+	if (func_info->var_accesses) {
+		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
+			VarAccess *working_va = func_info->var_accesses->data[i];
+			if (equal_var_accesses(var_access, working_va)) {
+				print_call_trace(var_access, call_trace);
+			}
+		}
 	}
+
+	if (func_info->callees) {
+		for (size_t i = 0; i < func_info->callees->size; ++i) {
+			trace_va_overlap(func_info, var_access, call_trace);
+		}
+	}
+
+	aos_pop_string(call_trace);
 }
 
 /* Initializes the state we're going to be

@@ -7,7 +7,8 @@ typedef struct {
 	size_t capacity;
 	size_t size;
 	size_t count;
-	char *data;
+	char *data;	// Packed string data
+	char **strings; // Pointer to each string
 } DynamicAOS;
 
 typedef enum {
@@ -17,6 +18,7 @@ typedef enum {
 	ERR_SYNTAX,
 	ERR_INVALID_ARG,
 	ERR_OUT_OF_MEMORY,
+	ERR_AOS_EMPTY,
 	ERR_IO
 } error_t;
 
