@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 				case CXDiagnostic_Warning:
 					formatted = clang_formatDiagnostic(diag, 
 							clang_defaultDiagnosticDisplayOptions());
-					print_error("Warning: \n\t%s\n", clang_getCString(formatted));
+					print_warn("Warning: \n\t%s\n", clang_getCString(formatted));
 					clang_disposeString(formatted);
 					break;
 				default:
@@ -172,25 +172,35 @@ int main(int argc, char **argv)
 					VarAccess *va_k = &func_info_i->access_footprint->data[k];
 					VarAccess *va_l = &func_info_j->access_footprint->data[l];
 
-					if (equal_var_accesses(va_k, va_l)) {
-						DynamicAOS *call_trace = init_aos();
-						printf("Local/Param overlap:\n");
-						trace_va_overlap(func_info_i, va_k, call_trace);
-						trace_va_overlap(func_info_j, va_l, call_trace);
-						printf("-------------------\n");
-						free_aos(call_trace);
-					}
-					
-					/* Checks globals, computationally expensive because of
-					 * string comparisons */
-					if (aos_contains_string(client_data->global_usrs, va_k->usr) &&
-					    aos_contains_string(client_data->global_usrs, va_l->usr)) {
-						DynamicAOS *call_trace = init_aos();
-						printf("Global variable overlap:\n");
-						trace_va_overlap(func_info_i, va_k, call_trace);
-						trace_va_overlap(func_info_j, va_l, call_trace);
-						printf("-----------------------\n");
-						free_aos(call_trace);
+					if (va_k->type != VarAccess_Null && va_l->type != VarAccess_Null) {
+						if (equal_var_accesses(va_k, va_l)) {
+							DynamicAOS *call_trace = init_aos();
+							printf("Local/Param overlap:\n");
+							trace_va_overlap(func_info_i, va_k, call_trace);
+							reset_aos(&call_trace);
+							trace_va_overlap(func_info_j, va_l, call_trace);
+							printf("-------------------\n");
+							va_k->type = VarAccess_Null;
+							va_l->type = VarAccess_Null;
+							free_aos(call_trace);
+							continue;
+						}
+						
+						/* Checks globals, computationally expensive because of
+						 * string comparisons */
+						if (aos_contains_string(client_data->global_usrs, va_k->usr) &&
+						    aos_contains_string(client_data->global_usrs, va_l->usr)) {
+							DynamicAOS *call_trace = init_aos();
+							printf("Global variable overlap:\n");
+							trace_va_overlap(func_info_i, va_k, call_trace);
+							reset_aos(&call_trace);
+							trace_va_overlap(func_info_j, va_l, call_trace);
+							printf("-----------------------\n");
+							va_k->type = VarAccess_Null;
+							va_l->type = VarAccess_Null;
+							free_aos(call_trace);
+						}
+
 					}
 				}
 			}

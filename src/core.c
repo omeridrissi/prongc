@@ -711,33 +711,42 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 
 static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
 {
+	printf(CLR_FUNC);
 	for (size_t i = 0; i < call_trace->count; ++i) {
-		printf("%s -> ", call_trace->strings[i]);
+		printf("%s%s %s->%s %s", call_trace->strings[i], 
+				CLR_RESET, CLR_ARROW, CLR_RESET, CLR_FUNC);
 	}
-	printf("line: %d, column: %d \n\t", var_access->line, var_access->column);
+	printf(CLR_RESET);
+	printf("%sline: %d, column: %d%s %s-------%s ", 
+			CLR_LOC, var_access->line, var_access->column, CLR_RESET,
+			CLR_ARROW, CLR_RESET);
 
+	printf(CLR_READ);
 	switch (var_access->type) {
 		case VarAccess_Read:
-			printf("READ: ");
+			printf("READ");
 			break;
 		case VarAccess_Write:
-			printf("WRITE: ");
+			printf("WRITE");
 			break;
 		case VarAccess_PtrRead:
-			printf("READ FROM ADDR: ");
+			printf("READ FROM ADDR");
 			break;
 		case VarAccess_PtrWrite:
-			printf("WRITE TO ADDR: ");
+			printf("WRITE TO ADDR");
 			break;
 		case VarAccess_Escape:
-			printf("escaped (possibly bug): ");
+			printf("escaped (possibly bug)");
 			break;
 		case VarAccess_Null:
-			printf("NULL: ");
+			printf("NULL");
 			break;
 	}
+	printf("%s: ", CLR_RESET);
 
+	printf(CLR_VAR);
 	printf("%s ", var_access->name);
+	printf(CLR_RESET);
 	if (var_access->is_ptr_type)
 		printf("(ptr)\n");
 	else
@@ -764,7 +773,8 @@ void trace_va_overlap(FuncInfo *func_info,
 
 	if (func_info->callees) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
-			trace_va_overlap(func_info, var_access, call_trace);
+			FuncInfo *working_func_info = &func_info->callees->data[i];
+			trace_va_overlap(working_func_info, var_access, call_trace);
 		}
 	}
 
