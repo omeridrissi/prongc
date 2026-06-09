@@ -2,6 +2,7 @@
 #include "dyn_aos.h"
 #include "core.h"
 #include "var_access.h"
+#include "log.h"
 
 // Since most of our functions handle pointers to
 // FuncInfo structs, we will point to one FuncInfo 
@@ -26,6 +27,8 @@ FuncInfo *init_func_info(CXCursor *cursor,
 	if (cursor != NULL) {
 		func_info->cursor = *cursor;
 	}
+
+	func_info->callees = NULL;
 
 	func_info->in_system_header = in_system_header;
 

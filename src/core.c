@@ -465,8 +465,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 	if (current_cursor_kind == CXCursor_CallExpr) {
 		CXCursor callee_decl = clang_getCursorReferenced(current_cursor);
 		if (!clang_Cursor_isNull(callee_decl)) {
-			CXCursor callee_def = clang_getCursorDefinition(callee_decl);
-			CXCursor working_cursor = callee_def;
+			CXCursor working_cursor = callee_decl;
 
 			CXString callee_usr = clang_getCursorUSR(working_cursor);
 			CXString callee_name = clang_getCursorDisplayName(working_cursor);
@@ -483,7 +482,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 
 			aos_push_string(prong_priv->touched_func_usrs,
 					clang_getCString(callee_usr));
-			
+		
 			// Checks if callee array is initialized
 			if (!prong_priv->current_func->callees)
 				prong_priv->current_func->callees = 
@@ -590,7 +589,7 @@ static void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_acc
 // This function was made with by deepseek
 /* Generate an artificial USR that's distinct from the usual
  * USR format but unique enough to compare to libclang USRs */
-static char *generate_artificial_param_usr(const char *name, size_t param_idx)
+static char *generate_artificial_param_usr(const char *name)
 {
 	const char *safe_name = name ? name : "";
 
@@ -601,16 +600,16 @@ static char *generate_artificial_param_usr(const char *name, size_t param_idx)
 		hash = ((hash << 5) + hash) + (unsigned char)safe_name[i];
 	}
 
-	// Format: p:<index>:<hash>:<namelen>:<name>
+	// Format: p:<hash>:<namelen>:<name>
 	size_t buffer_size = 48 + name_len;
 	char *usr = (char*)malloc(buffer_size);
 	if (!usr) return NULL;
 
 	if (name_len > 0) {
-		snprintf(usr, buffer_size, "p:%zu:%u:%zu:%s", param_idx,
+		snprintf(usr, buffer_size, "p:%u:%zu:%s",
 				hash, name_len, safe_name);
 	} else {
-		snprintf(usr, buffer_size, "p:%zu:unnamed", param_idx);
+		snprintf(usr, buffer_size, "p:null:unnamed");
 	}
 
 	return usr;
@@ -626,8 +625,9 @@ void unwind_func_info(FuncInfo *func_info,
 			struct prong_priv *client_data,
 			DynamicAOS *parsed_func_call)
 {
+	if (func_info->in_system_header)
+		return;
 	VarAccessArr *var_accesses = func_info->var_accesses;
-
 	// If we have a parsed function call, we're at the root function so
 	// we "map" our inputted arguments to our "parameter" variable accesses
 	// with an artificially generated "USR" 
@@ -641,7 +641,7 @@ void unwind_func_info(FuncInfo *func_info,
 					const char *parsed_arg = aos_string_at(parsed_func_call, i);
 				
 					free(var_access->usr);
-					var_access->usr = generate_artificial_param_usr(parsed_arg, i-1);
+					var_access->usr = generate_artificial_param_usr(parsed_arg);
 				}
 			}
 
@@ -657,7 +657,9 @@ void unwind_func_info(FuncInfo *func_info,
 				// var access USR, names etc.
 				FuncInfo *esc_func_info = get_func_info_by_usr(func_info->callees,
 									       var_access->esc_func_usr);
-				resolve_var_access_alias(esc_func_info, var_access);
+				print_func_info(esc_func_info, 0);
+				if (!esc_func_info->in_system_header)
+					resolve_var_access_alias(esc_func_info, var_access);
 			}
 		}
 	}
@@ -665,6 +667,7 @@ void unwind_func_info(FuncInfo *func_info,
 	// Null out irrelevant var accesses
 	for (size_t i = 0; i < var_accesses->size; ++i) {
 		VarAccess *var_access = &var_accesses->data[i];
+
 		if (/* var access usr is in locals but never escapes */
 		    !var_access->is_ptr_type &&
 		    var_access->type != VarAccess_Escape &&
@@ -678,11 +681,12 @@ void unwind_func_info(FuncInfo *func_info,
 			var_access->type = VarAccess_Null;
 		}
 	}
-	
+
 	// Recurse
-	if (func_info->callees) {
+	if (func_info->callees && !func_info->in_system_header) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
-			unwind_func_info(&func_info->callees->data[i],
+			FuncInfo *working_func_info = &func_info->callees->data[i];
+			unwind_func_info(working_func_info,
 					 client_data, NULL);
 		}
 	}
@@ -693,6 +697,9 @@ void unwind_func_info(FuncInfo *func_info,
  * of all variable accesses at func_info->access_footprint */
 void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint) 
 {
+	if (func_info->in_system_header)
+		return;
+
 	if (func_info->callees) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
 			build_var_access_footprint(&func_info->callees->data[i],
@@ -703,8 +710,7 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 		VarAccess *working_va = &func_info->var_accesses->data[i];
 	
-		if (working_va->type != VarAccess_Null &&
-		    working_va->type != VarAccess_Escape) 
+		if (working_va->type != VarAccess_Null) 
 			push_access_copy(access_footprint, working_va); 
 	}
 }
@@ -753,6 +759,49 @@ static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace)
 		printf("\n");
 }
 
+//static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
+//{
+//    if (!call_trace || call_trace->count == 0) return;
+//
+//    // Print the call chain as a tree
+//    for (size_t i = 0; i < call_trace->count; ++i) {
+//        // Indentation for depth > 0
+//        if (i > 0) {
+//            // For each ancestor level, print spaces (or vertical pipes if you want)
+//            for (size_t d = 0; d < i - 1; ++d)
+//                printf("    ");      // 4 spaces per depth (no branching)
+//            printf("%s└──%s ", CLR_ARROW, CLR_RESET);
+//        }
+//
+//        // Function name
+//        printf("%s%s%s", CLR_FUNC, call_trace->strings[i], CLR_RESET);
+//
+//        // If this is the last function in the chain, append the access details on the same line
+//        if (i == call_trace->count - 1) {
+//            printf(" %s→%s %sline: %d, col: %d%s  %s│%s ",
+//                   CLR_ARROW, CLR_RESET,
+//                   CLR_LOC, var_access->line, var_access->column, CLR_RESET,
+//                   CLR_ARROW, CLR_RESET);
+//
+//            // Access type
+//            switch (var_access->type) {
+//                case VarAccess_Read:      printf("%sREAD%s", CLR_READ, CLR_RESET); break;
+//                case VarAccess_Write:     printf("%sWRITE%s", CLR_WRITE, CLR_RESET); break;
+//                case VarAccess_PtrRead:   printf("%sREAD FROM ADDR%s", CLR_PTRREAD, CLR_RESET); break;
+//                case VarAccess_PtrWrite:  printf("%sWRITE TO ADDR%s", CLR_PTRWRITE, CLR_RESET); break;
+//                case VarAccess_Escape:    printf("%sESCAPE%s", CLR_ESCAPE, CLR_RESET); break;
+//                default:                  printf("?");
+//            }
+//
+//            printf(" : %s%s%s", CLR_VAR, var_access->name, CLR_RESET);
+//            if (var_access->is_ptr_type)
+//                printf(" (ptr)");
+//            printf("\n");
+//        } else {
+//            printf("\n");
+//        }
+//    }
+//}
 /* Goes in "func_info" graph recursively and tries to find
  * "var_access" struct while keeping track of it's "call_trace".
  * When it finds the function, it prints out the call trace. */

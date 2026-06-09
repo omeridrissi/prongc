@@ -31,7 +31,7 @@ DynamicAOS *init_aos(void)
 void free_aos(DynamicAOS *array) 
 {
 	free(array->data);
-	array->capacity = 0;
+	free(array->strings);
 	array->capacity = 0;
 
 	/* Makes it easier to check for bugs later on */

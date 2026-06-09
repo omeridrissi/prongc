@@ -133,28 +133,27 @@ int main(int argc, char **argv)
 
 	//	print_func_info_array(client_data->funcs, 0);
 	//}
-
+	
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
 		const char *func_call = aos_string_at(client_data->func_names, i);
 		DynamicAOS *parsed_func_call = init_aos();
 
 		parse_func_call(func_call, parsed_func_call);
-		
 		unwind_func_info(&client_data->funcs->data[i], client_data, parsed_func_call);
 
 		free_aos(parsed_func_call);
 	}
-
+	
 	/* Build array of variable accesses that contains ALL
 	 * variable accesses recursively */
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
 		FuncInfo *working_func_info = &client_data->funcs->data[i];
 		working_func_info->access_footprint = init_var_access_array();
-
+		
 		build_var_access_footprint(working_func_info,
 					   working_func_info->access_footprint);
 	}
-
+	
 	// Messiest part :(
 	/* Basically checks if two FuncInfos contain the same VarAccess by
 	 * using the collection of all variable accesses from both functions 
@@ -175,7 +174,7 @@ int main(int argc, char **argv)
 					if (va_k->type != VarAccess_Null && va_l->type != VarAccess_Null) {
 						if (equal_var_accesses(va_k, va_l)) {
 							DynamicAOS *call_trace = init_aos();
-							printf("Local/Param overlap:\n");
+							printf("Variable overlap:\n");
 							trace_va_overlap(func_info_i, va_k, call_trace);
 							reset_aos(&call_trace);
 							trace_va_overlap(func_info_j, va_l, call_trace);
@@ -186,21 +185,6 @@ int main(int argc, char **argv)
 							continue;
 						}
 						
-						/* Checks globals, computationally expensive because of
-						 * string comparisons */
-						if (aos_contains_string(client_data->global_usrs, va_k->usr) &&
-						    aos_contains_string(client_data->global_usrs, va_l->usr)) {
-							DynamicAOS *call_trace = init_aos();
-							printf("Global variable overlap:\n");
-							trace_va_overlap(func_info_i, va_k, call_trace);
-							reset_aos(&call_trace);
-							trace_va_overlap(func_info_j, va_l, call_trace);
-							printf("-----------------------\n");
-							va_k->type = VarAccess_Null;
-							va_l->type = VarAccess_Null;
-							free_aos(call_trace);
-						}
-
 					}
 				}
 			}

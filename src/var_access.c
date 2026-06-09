@@ -146,7 +146,7 @@ void print_var_access(VarAccess *var_access, int indentation)
 
 bool equal_var_accesses(VarAccess *va_a, VarAccess *va_b) 
 {
-	return (memcmp(va_a, va_b, sizeof(VarAccess)) == 0);
+	return (strcmp(va_a->usr, va_b->usr) == 0);
 }
 
 void print_var_access_array(VarAccessArr *var_access_array, int indentation) 
