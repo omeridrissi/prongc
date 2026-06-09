@@ -637,7 +637,6 @@ void unwind_func_info(FuncInfo *func_info,
 				// var access USR, names etc.
 				FuncInfo *esc_func_info = get_func_info_by_usr(func_info->callees,
 									       var_access->esc_func_usr);
-				print_func_info(esc_func_info, 0);
 				if (!esc_func_info->in_system_header)
 					resolve_var_access_alias(esc_func_info, var_access);
 			}
