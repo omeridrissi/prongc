@@ -174,11 +174,11 @@ int main(int argc, char **argv)
 					if (va_k->type != VarAccess_Null && va_l->type != VarAccess_Null) {
 						if (equal_var_accesses(va_k, va_l)) {
 							DynamicAOS *call_trace = init_aos();
-							printf("Variable overlap:\n");
+							printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
 							trace_va_overlap(func_info_i, va_k, call_trace);
 							reset_aos(&call_trace);
 							trace_va_overlap(func_info_j, va_l, call_trace);
-							printf("-------------------\n");
+							printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
 							va_k->type = VarAccess_Null;
 							va_l->type = VarAccess_Null;
 							free_aos(call_trace);
