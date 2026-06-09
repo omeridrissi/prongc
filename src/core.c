@@ -161,7 +161,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				aos_push_string(prong_priv->current_func->params,
 						clang_getCString(current_cursor_usr));
 				break;
-			default:
+			default: break;
 				
 		}
 		clang_disposeString(current_cursor_usr);
