@@ -84,26 +84,6 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 			free_aos(parsed_func_name);
 		}
 
-		//if (aos_contains_string(prong_priv->func_names, elem_name)) {
-		//	CXString cursor_usr = clang_getCursorUSR(parent_cursor);
-		//	if (arg_verbose) {
-		//		print_verbose("Visiting element %s\n", 
-		//			      clang_getCString(parent_display_name));
-		//		print_verbose("	kind: %d\n", 
-		//			      clang_getCursorKind(parent_cursor));
-		//		print_verbose("	unified symbol representation: %s\n", 
-		//			      clang_getCString(cursor_usr));
-
-		//	}
-		//	
-		//	push_func_info(prong_priv->funcs,
-		//			&parent_cursor,
-		//			clang_getCString(cursor_usr),
-		//			clang_getCString(parent_display_name),
-		//			false);
-
-		//	clang_disposeString(cursor_usr);
-		//}
 		clang_disposeString(parent_display_name);
 		clang_disposeString(parent_spelling);
 		
@@ -715,93 +695,94 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	}
 }
 
-static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
-{
-	printf(CLR_FUNC);
-	for (size_t i = 0; i < call_trace->count; ++i) {
-		printf("%s%s %s->%s %s", call_trace->strings[i], 
-				CLR_RESET, CLR_ARROW, CLR_RESET, CLR_FUNC);
-	}
-	printf(CLR_RESET);
-	printf("%sline: %d, column: %d%s %s-------%s ", 
-			CLR_LOC, var_access->line, var_access->column, CLR_RESET,
-			CLR_ARROW, CLR_RESET);
-
-	printf(CLR_READ);
-	switch (var_access->type) {
-		case VarAccess_Read:
-			printf("READ");
-			break;
-		case VarAccess_Write:
-			printf("WRITE");
-			break;
-		case VarAccess_PtrRead:
-			printf("READ FROM ADDR");
-			break;
-		case VarAccess_PtrWrite:
-			printf("WRITE TO ADDR");
-			break;
-		case VarAccess_Escape:
-			printf("escaped (possibly bug)");
-			break;
-		case VarAccess_Null:
-			printf("NULL");
-			break;
-	}
-	printf("%s: ", CLR_RESET);
-
-	printf(CLR_VAR);
-	printf("%s ", var_access->name);
-	printf(CLR_RESET);
-	if (var_access->is_ptr_type)
-		printf("(ptr)\n");
-	else
-		printf("\n");
-}
-
 //static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
 //{
-//    if (!call_trace || call_trace->count == 0) return;
+//	printf(CLR_FUNC);
+//	for (size_t i = 0; i < call_trace->count; ++i) {
+//		printf("%s%s %s->%s %s", call_trace->strings[i], 
+//				CLR_RESET, CLR_ARROW, CLR_RESET, CLR_FUNC);
+//	}
+//	printf(CLR_RESET);
+//	printf("%sline: %d, column: %d%s %s-------%s ", 
+//			CLR_LOC, var_access->line, var_access->column, CLR_RESET,
+//			CLR_ARROW, CLR_RESET);
 //
-//    // Print the call chain as a tree
-//    for (size_t i = 0; i < call_trace->count; ++i) {
-//        // Indentation for depth > 0
-//        if (i > 0) {
-//            // For each ancestor level, print spaces (or vertical pipes if you want)
-//            for (size_t d = 0; d < i - 1; ++d)
-//                printf("    ");      // 4 spaces per depth (no branching)
-//            printf("%s└──%s ", CLR_ARROW, CLR_RESET);
-//        }
+//	printf(CLR_READ);
+//	switch (var_access->type) {
+//		case VarAccess_Read:
+//			printf("READ");
+//			break;
+//		case VarAccess_Write:
+//			printf("WRITE");
+//			break;
+//		case VarAccess_PtrRead:
+//			printf("READ FROM ADDR");
+//			break;
+//		case VarAccess_PtrWrite:
+//			printf("WRITE TO ADDR");
+//			break;
+//		case VarAccess_Escape:
+//			printf("escaped (possibly bug)");
+//			break;
+//		case VarAccess_Null:
+//			printf("NULL");
+//			break;
+//	}
+//	printf("%s: ", CLR_RESET);
 //
-//        // Function name
-//        printf("%s%s%s", CLR_FUNC, call_trace->strings[i], CLR_RESET);
-//
-//        // If this is the last function in the chain, append the access details on the same line
-//        if (i == call_trace->count - 1) {
-//            printf(" %s→%s %sline: %d, col: %d%s  %s│%s ",
-//                   CLR_ARROW, CLR_RESET,
-//                   CLR_LOC, var_access->line, var_access->column, CLR_RESET,
-//                   CLR_ARROW, CLR_RESET);
-//
-//            // Access type
-//            switch (var_access->type) {
-//                case VarAccess_Read:      printf("%sREAD%s", CLR_READ, CLR_RESET); break;
-//                case VarAccess_Write:     printf("%sWRITE%s", CLR_WRITE, CLR_RESET); break;
-//                case VarAccess_PtrRead:   printf("%sREAD FROM ADDR%s", CLR_PTRREAD, CLR_RESET); break;
-//                case VarAccess_PtrWrite:  printf("%sWRITE TO ADDR%s", CLR_PTRWRITE, CLR_RESET); break;
-//                case VarAccess_Escape:    printf("%sESCAPE%s", CLR_ESCAPE, CLR_RESET); break;
-//                default:                  printf("?");
-//            }
-//
-//            printf(" : %s%s%s", CLR_VAR, var_access->name, CLR_RESET);
-//            if (var_access->is_ptr_type)
-//                printf(" (ptr)");
-//            printf("\n");
-//        } else {
-//            printf("\n");
-//        }
-//    }
+//	printf(CLR_VAR);
+//	printf("%s ", var_access->name);
+//	printf(CLR_RESET);
+//	if (var_access->is_ptr_type)
+//		printf("(ptr)\n");
+//	else
+//		printf("\n");
 //}
+
+static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
+{
+    if (!call_trace || call_trace->count == 0) return;
+
+    // Print the call chain as a tree
+    for (size_t i = 0; i < call_trace->count; ++i) {
+        // Indentation for depth > 0
+        if (i > 0) {
+            // For each ancestor level, print spaces (or vertical pipes if you want)
+            for (size_t d = 0; d < i - 1; ++d)
+                printf("    ");      // 4 spaces per depth (no branching)
+            printf("%s└──%s ", CLR_ARROW, CLR_RESET);
+        }
+
+        // Function name
+        printf("%s%s%s", CLR_FUNC, call_trace->strings[i], CLR_RESET);
+
+        // If this is the last function in the chain, append the access details on the same line
+        if (i == call_trace->count - 1) {
+            printf(" %s→%s %sline: %d, col: %d%s  %s│%s ",
+                   CLR_ARROW, CLR_RESET,
+                   CLR_LOC, var_access->line, var_access->column, CLR_RESET,
+                   CLR_ARROW, CLR_RESET);
+
+            // Access type
+            switch (var_access->type) {
+                case VarAccess_Read:      printf("%sREAD%s", CLR_READ, CLR_RESET); break;
+                case VarAccess_Write:     printf("%sWRITE%s", CLR_WRITE, CLR_RESET); break;
+                case VarAccess_PtrRead:   printf("%sREAD FROM ADDR%s", CLR_PTRREAD, CLR_RESET); break;
+                case VarAccess_PtrWrite:  printf("%sWRITE TO ADDR%s", CLR_PTRWRITE, CLR_RESET); break;
+                case VarAccess_Escape:    printf("%sESCAPE%s", CLR_ESCAPE, CLR_RESET); break;
+                default:                  printf("?");
+            }
+
+            printf(" : %s%s%s", CLR_VAR, var_access->name, CLR_RESET);
+            if (var_access->is_ptr_type)
+                printf(" (ptr)");
+            printf("\n");
+        } else {
+            printf("\n");
+        }
+    }
+}
+
 /* Goes in "func_info" graph recursively and tries to find
  * "var_access" struct while keeping track of it's "call_trace".
  * When it finds the function, it prints out the call trace. */
@@ -814,7 +795,7 @@ void trace_va_overlap(FuncInfo *func_info,
 	if (func_info->var_accesses) {
 		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 			VarAccess *working_va = &func_info->var_accesses->data[i];
-			if (equal_var_accesses(var_access, working_va)) {
+			if (equal_var_access_structs(var_access, working_va)) {
 				print_call_trace(var_access, call_trace);
 			}
 		}

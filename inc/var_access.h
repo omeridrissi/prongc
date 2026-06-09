@@ -22,6 +22,7 @@ void		push_var_access(VarAccessArr *var_access_array,
 void		push_access_copy(VarAccessArr *var_access_array, VarAccess *var_access);
 
 bool		equal_var_accesses(VarAccess *va_a, VarAccess *va_b);
+bool		equal_var_access_structs(VarAccess *va_a, VarAccess *va_b);
 
 void		print_var_access(VarAccess *var_access, 
 				 int indentation);

@@ -149,6 +149,11 @@ bool equal_var_accesses(VarAccess *va_a, VarAccess *va_b)
 	return (strcmp(va_a->usr, va_b->usr) == 0);
 }
 
+bool equal_var_access_structs(VarAccess *va_a, VarAccess *va_b) 
+{
+	return (memcmp(va_a->usr, va_b->usr, sizeof(VarAccess)) == 0);
+}
+
 void print_var_access_array(VarAccessArr *var_access_array, int indentation) 
 {
 	for (size_t i = 0; i < var_access_array->size; ++i) {
