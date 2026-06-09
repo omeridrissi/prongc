@@ -53,4 +53,32 @@ void print_error(const char *format, ...)
 	va_end(args);
 }
 
+void print_source_line(CXSourceLocation loc) {
+	CXFile file;
+	unsigned line, column, offset;
+	clang_getSpellingLocation(loc, &file, &line, &column, &offset);
 
+	CXString filename = clang_getFileName(file);
+	const char *path = clang_getCString(filename);
+
+	FILE *fp = fopen(path, "r");
+	if (!fp) {
+		clang_disposeString(filename);
+		return;
+	}
+
+	char buf[1024];
+	for (unsigned i = 1; i <= line; i++) {
+		if (!fgets(buf, sizeof(buf), fp)) break;
+	}
+
+	if (buf[0]) {
+		buf[strcspn(buf, "\r\n")] = '\0';
+		
+		printf("      %s%s%s\n", CLR_VAR, buf, CLR_RESET);
+		printf("      %*s%s^%s\n", column - 1, "", CLR_ARROW, CLR_RESET);
+	}
+
+	fclose(fp);
+	clang_disposeString(filename);
+}

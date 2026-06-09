@@ -33,7 +33,6 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	/* Collects function declaration cursors */
 	if ((current_cursor_kind == CXCursor_CompoundStmt) &&
 	    (parent_cursor_kind == CXCursor_FunctionDecl)) {
-		
 		for (size_t i = 0; i < prong_priv->func_names->count; ++i) {
 			const char *func_name = aos_string_at(prong_priv->func_names, i);
 			DynamicAOS *parsed_func_name = init_aos();
@@ -449,6 +448,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 
 			CXString callee_usr = clang_getCursorUSR(working_cursor);
 			CXString callee_name = clang_getCursorDisplayName(working_cursor);
+		
 
 			// Make sure we don't fall into an
 			// infinite recursion loop
@@ -738,48 +738,64 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 //		printf("\n");
 //}
 
-static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
+static void print_call_trace(FuncInfo *func_info,
+			     VarAccess *var_access, 
+			     DynamicAOS *call_trace) 
 {
-    if (!call_trace || call_trace->count == 0) return;
+	if (!call_trace || call_trace->count == 0) return;
 
-    // Print the call chain as a tree
-    for (size_t i = 0; i < call_trace->count; ++i) {
-        // Indentation for depth > 0
-        if (i > 0) {
-            // For each ancestor level, print spaces (or vertical pipes if you want)
-            for (size_t d = 0; d < i - 1; ++d)
-                printf("    ");      // 4 spaces per depth (no branching)
-            printf("%s└──%s ", CLR_ARROW, CLR_RESET);
-        }
+	CXCursor func_cursor = func_info->cursor;
+	CXTranslationUnit tu = clang_Cursor_getTranslationUnit(func_cursor);
 
-        // Function name
-        printf("%s%s%s", CLR_FUNC, call_trace->strings[i], CLR_RESET);
+	CXSourceLocation func_cursor_loc = clang_getCursorLocation(func_cursor);
 
-        // If this is the last function in the chain, append the access details on the same line
-        if (i == call_trace->count - 1) {
-            printf(" %s→%s %sline: %d, col: %d%s  %s│%s ",
-                   CLR_ARROW, CLR_RESET,
-                   CLR_LOC, var_access->line, var_access->column, CLR_RESET,
-                   CLR_ARROW, CLR_RESET);
+	CXFile file;
+	clang_getSpellingLocation(func_cursor_loc, &file, NULL, NULL, NULL);
 
-            // Access type
-            switch (var_access->type) {
-                case VarAccess_Read:      printf("%sREAD%s", CLR_READ, CLR_RESET); break;
-                case VarAccess_Write:     printf("%sWRITE%s", CLR_WRITE, CLR_RESET); break;
-                case VarAccess_PtrRead:   printf("%sREAD FROM ADDR%s", CLR_PTRREAD, CLR_RESET); break;
-                case VarAccess_PtrWrite:  printf("%sWRITE TO ADDR%s", CLR_PTRWRITE, CLR_RESET); break;
-                case VarAccess_Escape:    printf("%sESCAPE%s", CLR_ESCAPE, CLR_RESET); break;
-                default:                  printf("?");
-            }
+	CXString file_name = clang_getFileName(file);
 
-            printf(" : %s%s%s", CLR_VAR, var_access->name, CLR_RESET);
-            if (var_access->is_ptr_type)
-                printf(" (ptr)");
-            printf("\n");
-        } else {
-            printf("\n");
-        }
-    }
+	// Print the call chain as a tree
+	for (size_t i = 0; i < call_trace->count; ++i) {
+		// Indentation for depth > 0
+		if (i > 0) {
+			// For each ancestor level, print spaces (or vertical pipes if you want)
+			for (size_t d = 0; d < i - 1; ++d)
+				printf("	");	  // 4 spaces per depth (no branching)
+			printf("%s└──%s ", CLR_ARROW, CLR_RESET);
+		}
+
+		// Function name
+		printf("%s%s%s", CLR_FUNC, call_trace->strings[i], CLR_RESET);
+
+		// If this is the last function in the chain, append the access details on the same line
+		if (i == call_trace->count - 1) {
+			printf(" %s→%s %s%s, line: %d, col: %d%s  %s│%s ",
+				   CLR_ARROW, CLR_RESET,
+				   CLR_LOC, clang_getCString(file_name), var_access->line, 
+				   var_access->column, CLR_RESET,
+				   CLR_ARROW, CLR_RESET);
+
+			// Access type
+			switch (var_access->type) {
+				case VarAccess_Read:	printf("%sREAD%s", CLR_READ, CLR_RESET); break;
+				case VarAccess_Write:	printf("%sWRITE%s", CLR_WRITE, CLR_RESET); break;
+				case VarAccess_PtrRead:	printf("%sREAD FROM ADDR%s", CLR_PTRREAD, CLR_RESET); break;
+				case VarAccess_PtrWrite:printf("%sWRITE TO ADDR%s", CLR_PTRWRITE, CLR_RESET); break;
+				case VarAccess_Escape:	printf("%sESCAPE%s", CLR_ESCAPE, CLR_RESET); break;
+				default:		printf("?");
+			}
+
+			printf(" : %s%s%s", CLR_VAR, var_access->name, CLR_RESET);
+			if (var_access->is_ptr_type)
+				printf(" (ptr)");
+			printf("\n");
+		} else {
+			printf("\n");
+		}
+	}
+	print_source_line(clang_getLocation(tu, file, 
+					var_access->line, var_access->column));
+	clang_disposeString(file_name);
 }
 
 /* Goes in "func_info" graph recursively and tries to find
@@ -787,7 +803,7 @@ static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace)
  * When it finds the function, it prints out the call trace. */
 void trace_va_overlap(FuncInfo *func_info,
 		      VarAccess *var_access,
-		      DynamicAOS *call_trace) 
+		      DynamicAOS *call_trace)
 {
 	aos_push_string(call_trace, func_info->name);
 
@@ -795,7 +811,7 @@ void trace_va_overlap(FuncInfo *func_info,
 		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 			VarAccess *working_va = &func_info->var_accesses->data[i];
 			if (equal_var_access_structs(var_access, working_va)) {
-				print_call_trace(var_access, call_trace);
+				print_call_trace(func_info, var_access, call_trace);
 			}
 		}
 	}
@@ -803,7 +819,8 @@ void trace_va_overlap(FuncInfo *func_info,
 	if (func_info->callees) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
 			FuncInfo *working_func_info = &func_info->callees->data[i];
-			trace_va_overlap(working_func_info, var_access, call_trace);
+			trace_va_overlap(working_func_info, var_access, 
+					 call_trace);
 		}
 	}
 
