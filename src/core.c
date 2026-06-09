@@ -843,6 +843,7 @@ struct prong_priv *prong_init_priv()
 
 	prong_priv->func_names = init_aos();
 	prong_priv->file_names = init_aos();
+	prong_priv->clang_args = init_aos();
 
 	prong_priv->global_usrs = init_aos();
 
@@ -864,6 +865,9 @@ void prong_free_priv(struct prong_priv *prong_priv)
 		free_aos(prong_priv->func_names);
 	if (prong_priv->file_names)
 		free_aos(prong_priv->file_names);
+
+	if (prong_priv->clang_args)
+		free_aos(prong_priv->clang_args);
 
 	if (prong_priv->global_usrs)
 		free_aos(prong_priv->global_usrs);
@@ -997,7 +1001,7 @@ error_t process_args(int argc, char **argv,
 {
 	char *cmd_arg;
 
-	for (int i = 0; i < argc; ++i) {
+	for (int i = 1; i < argc; ++i) {
 		cmd_arg	= argv[i];
 		
 		if (strncmp(cmd_arg, "--files=", FILES_ARG_STRLEN) == 0) {
@@ -1009,7 +1013,7 @@ error_t process_args(int argc, char **argv,
 		} else if (strcmp(cmd_arg, "--help") == 0) {
 			arg_help = true;
 		} else {
-			continue;
+			aos_push_string(prong_priv->clang_args, cmd_arg);
 		}
 	}
 

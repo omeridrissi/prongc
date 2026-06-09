@@ -37,6 +37,10 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
+	printf("%s[info]%s using clang arguments: ", CLR_VAR, CLR_RESET);
+	aos_print_strings(client_data->clang_args);
+	printf("\n");
+
 	if (client_data->func_names->count < 2) {
 		print_error("Need multiple functions for variable overlap tracing\n");
 		print_usage(argv[0]);
@@ -59,7 +63,9 @@ int main(int argc, char **argv)
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
 		tu_array[i] = clang_parseTranslationUnit(
 			index,
-			aos_string_at(client_data->file_names, i), NULL, 0,
+			aos_string_at(client_data->file_names, i), 
+			(const char * const*)client_data->clang_args->strings,
+			client_data->clang_args->count,
 			NULL, 0,
 			CXTranslationUnit_None
 		);

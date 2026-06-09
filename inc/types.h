@@ -97,7 +97,8 @@ typedef struct {
 struct prong_priv {
 	DynamicAOS	*func_names;	// The func names we get from cmdline
 	DynamicAOS	*file_names;	// The file names we get from cmdline
-	
+	DynamicAOS	*clang_args;	// Arguments to be passed to libclang
+
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
 	
 	/* While recursing through the children of a cursor,
