@@ -34,7 +34,7 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	if ((current_cursor_kind == CXCursor_CompoundStmt) &&
 	    (parent_cursor_kind == CXCursor_FunctionDecl)) {
 		for (size_t i = 0; i < prong_priv->func_names->count; ++i) {
-			const char *func_name = aos_string_at(prong_priv->func_names, i);
+			char *func_name = prong_priv->func_names->strings[i];
 			DynamicAOS *parsed_func_name = init_aos();
 
 			parse_func_call(func_name, parsed_func_name);
@@ -62,11 +62,11 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 
 				CXString cursor_usr = clang_getCursorUSR(parent_cursor);
 				if (arg_verbose) {
-					print_verbose("Visiting element %s\n", 
+					print_verbose("Found function CXCursor: %s\n", 
 						      clang_getCString(parent_display_name));
-					print_verbose("	kind: %d\n", 
+					print_verbose("	Kind: %d\n", 
 						      clang_getCursorKind(parent_cursor));
-					print_verbose("	unified symbol representation: %s\n", 
+					print_verbose("	USR: %s\n", 
 						      clang_getCString(cursor_usr));
 	
 				}
@@ -965,14 +965,15 @@ error_t parse_func_call(const char *input, DynamicAOS *out) {
 	return ERR_OK;
 }
 
-/* Turns comma-separated strings into a 
+/* Turns semicolon-separated strings into a 
  * dynamic string array DynamicAOS */
 static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 {
 	char *files_str_array = strdup(str_in);
 	char *temp = files_str_array;
 	size_t num_files = 1;
-	int offset = 0;
+	size_t offset = 0;
+
 	while (temp[offset] != '\0') {
 		if (temp[offset] == ';') {
 			temp[offset] = '\0';
@@ -982,12 +983,15 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 	}
 
 	for (size_t n = 0; n < num_files; ++n) {
-		aos_push_string(dyn_aos, temp);
-		temp += strlen(temp)+1;
+		// Skip leading whitespace
+		while (*temp == ' ' || *temp == '\t') temp++;
+		if (*temp != '\0') {
+			aos_push_string(dyn_aos, temp);
+		}
+		temp += strlen(temp) + 1;
 	}
 
 	free(files_str_array);
-
 }
 
 #define FILES_ARG_STRLEN 8
@@ -1003,7 +1007,7 @@ error_t process_args(int argc, char **argv,
 
 	for (int i = 1; i < argc; ++i) {
 		cmd_arg	= argv[i];
-		
+
 		if (strncmp(cmd_arg, "--files=", FILES_ARG_STRLEN) == 0) {
 			split_comma_list(cmd_arg+FILES_ARG_STRLEN, prong_priv->file_names);
 		} else if (strncmp(cmd_arg, "--functions=", FUNCS_ARG_STRLEN) == 0) {

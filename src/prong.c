@@ -40,6 +40,10 @@ int main(int argc, char **argv)
 	printf("%s[info]%s using clang arguments: ", CLR_VAR, CLR_RESET);
 	aos_print_strings(client_data->clang_args);
 	printf("\n");
+	
+	printf("%s[info]%s searching function CXCursors: ", CLR_VAR, CLR_RESET);
+	aos_print_strings(client_data->func_names);
+	printf("\n");
 
 	if (client_data->func_names->count < 2) {
 		print_error("Need multiple functions for variable overlap tracing\n");

@@ -44,6 +44,16 @@ void reset_aos(DynamicAOS **array)
 	*array = init_aos();
 }
 
+/* Update all string values to new ones */
+static void aos_update_old_strings(DynamicAOS *array) {
+	size_t offset = 0;
+	for (size_t i = 0; i < array->count; ++i) {
+		char *current = array->data + offset;
+		array->strings[i] = current;
+		offset += strlen(current)+1;
+	}
+}
+
 /* Push string on top of the array, automatically 
  * realloc if not enough size */
 error_t aos_push_string(DynamicAOS *array, const char *str)
@@ -60,6 +70,9 @@ bounds_check:
 			return ERR_OUT_OF_MEMORY;
 
 		array->capacity = new_cap;
+		aos_update_old_strings(array); // array->strings[] now points to old freed buffer.
+					       // udpates all array->strings[] values to fit new one.
+
 		goto bounds_check;
 	}
 
