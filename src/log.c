@@ -74,9 +74,18 @@ void print_source_line(CXSourceLocation loc) {
 
 	if (buf[0]) {
 		buf[strcspn(buf, "\r\n")] = '\0';
-		
-		printf("      %s%s%s\n", CLR_VAR, buf, CLR_RESET);
-		printf("      %*s%s^%s\n", column - 1, "", CLR_ARROW, CLR_RESET);
+	
+		int num_tabs = 0;
+		for (size_t i = 0; i < 1024; ++i) {
+			if (buf[i] == '\n' || buf[i] == '\0')
+				break;
+			if (buf[i] == '\t') {
+				num_tabs++;
+			}
+		}
+
+		printf("%*s%s%s%s\n", num_tabs, "\t", CLR_VAR, buf+num_tabs, CLR_RESET);
+		printf("%*s%*s%s^%s\n", num_tabs, "\t", column-num_tabs-1, "", CLR_ARROW, CLR_RESET);
 	}
 
 	fclose(fp);
