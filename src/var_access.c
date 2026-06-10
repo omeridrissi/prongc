@@ -88,8 +88,21 @@ void push_var_access(VarAccessArr *var_access_array,
 
 }
 
+static bool va_array_contains(VarAccessArr *var_access_array, VarAccess *var_access) 
+{
+	for (size_t i = 0; i < var_access_array->size; ++i) {
+		VarAccess *working_va = &var_access_array->data[i];
+		if (equal_var_access_structs(working_va, var_access)) 
+			return true;
+	}
+	return false;
+}
+
 void push_access_copy(VarAccessArr *var_access_array, VarAccess *var_access)
 {
+	if (va_array_contains(var_access_array, var_access))
+		return;
+
 	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
 		var_access_array->capacity *= 2;
 		var_access_array->data = reallocarray(var_access_array->data,

@@ -75,7 +75,7 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 						&parent_cursor,
 						clang_getCString(cursor_usr),
 						clang_getCString(parent_display_name),
-						false);
+						false, true);
 	
 				clang_disposeString(cursor_usr);
 			}
@@ -471,18 +471,20 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			CXSourceLocation callee_location = 
 				clang_getCursorLocation(working_cursor);
 			
+			
 			push_func_info(
 				prong_priv->current_func->callees,
 				&working_cursor,
 				clang_getCString(callee_usr),
 				clang_getCString(callee_name),
-				clang_Location_isInSystemHeader(callee_location));
+				clang_Location_isInSystemHeader(callee_location),
+				clang_isCursorDefinition(working_cursor));
 			
 			clang_disposeString(callee_usr);
 			clang_disposeString(callee_name);
 			
-			if (func_info_array_tail(
-			    prong_priv->current_func->callees)->in_system_header) {
+			FuncInfo *tail = func_info_array_tail(prong_priv->current_func->callees);
+			if (tail->in_system_header || !tail->has_definition) {
 				push_cursor(prong_priv->ancestry_stack, &current_cursor);
 				goto visitor_recurse;
 			}
@@ -540,8 +542,10 @@ void process_func_info(FuncInfo *func_info,
 static void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_access)
 {
 	if (func_info_is_null(esc_func_info)) {
-		print_warn("Tried to resolve variable access alias for null esc_func_info \
-				perhaps not found?\n");
+		print_warn(
+		"Tried to resolve variable access alias for null esc_func_info \
+		perhaps not found?\n"
+		);
 		return;
 	}
 
@@ -581,7 +585,7 @@ static char *generate_artificial_param_usr(const char *name)
 	}
 
 	// Format: p:<hash>:<namelen>:<name>
-	size_t buffer_size = 48 + name_len;
+	size_t buffer_size = 64 + name_len;
 	char *usr = (char*)malloc(buffer_size);
 	if (!usr) return NULL;
 
@@ -605,8 +609,9 @@ void unwind_func_info(FuncInfo *func_info,
 			struct prong_priv *client_data,
 			DynamicAOS *parsed_func_call)
 {
-	if (func_info->in_system_header)
+	if (func_info->in_system_header || !func_info->has_definition)
 		return;
+
 	VarAccessArr *var_accesses = func_info->var_accesses;
 	// If we have a parsed function call, we're at the root function so
 	// we "map" our inputted arguments to our "parameter" variable accesses
@@ -614,20 +619,22 @@ void unwind_func_info(FuncInfo *func_info,
 	if (parsed_func_call != NULL) {
 		for (size_t i = 1; i < parsed_func_call->count; ++i) {
 			const char *param_usr = aos_string_at(func_info->params, i-1);
+			if (var_accesses && param_usr) {
+				for (size_t j = 0; j < var_accesses->size; ++j) {
+					VarAccess *var_access = &var_accesses->data[j];
 
-			for (size_t j = 0; j < var_accesses->size; ++j) {
-				VarAccess *var_access = &var_accesses->data[j];
-				if (strcmp(var_access->usr, param_usr) == 0) {
-					const char *parsed_arg = aos_string_at(parsed_func_call, i);
-				
-					free(var_access->usr);
-					var_access->usr = generate_artificial_param_usr(parsed_arg);
+					if (strcmp(var_access->usr, param_usr) == 0) {
+						const char *parsed_arg = aos_string_at(parsed_func_call, i);
+						free(var_access->usr);
+						var_access->usr = generate_artificial_param_usr(parsed_arg);
+					}
 				}
+
 			}
 
 		}
 	}
-
+	
 	// Resolve var to param aliases for this FuncInfo
 	if (func_info->callees) {
 		for (size_t i = 0; i < var_accesses->size; ++i) {
@@ -637,28 +644,31 @@ void unwind_func_info(FuncInfo *func_info,
 				// var access USR, names etc.
 				FuncInfo *esc_func_info = get_func_info_by_usr(func_info->callees,
 									       var_access->esc_func_usr);
-				if (!esc_func_info->in_system_header)
+				if (esc_func_info && !esc_func_info->in_system_header)
 					resolve_var_access_alias(esc_func_info, var_access);
 			}
 		}
 	}
 
 	// Null out irrelevant var accesses
-	for (size_t i = 0; i < var_accesses->size; ++i) {
-		VarAccess *var_access = &var_accesses->data[i];
+	if (var_accesses != NULL) {
+		for (size_t i = 0; i < var_accesses->size; ++i) {
+			VarAccess *var_access = &var_accesses->data[i];
 
-		if (/* var access usr is in locals but never escapes */
-		    !var_access->is_ptr_type &&
-		    var_access->type != VarAccess_Escape &&
-		    aos_contains_string(func_info->locals, var_access->usr)) {
-			var_access->type = VarAccess_Null;
+			if (/* var access usr is in locals but never escapes */
+			    !var_access->is_ptr_type &&
+			    var_access->type != VarAccess_Escape &&
+			    aos_contains_string(func_info->locals, var_access->usr)) {
+				var_access->type = VarAccess_Null;
+			}
+
+			if (/* var access usr is in params and is normal variable read/write */
+			    (var_access->type == VarAccess_Read || var_access->type == VarAccess_Write) &&
+			    aos_contains_string(func_info->params, var_access->usr)) {
+				var_access->type = VarAccess_Null;
+			}
 		}
 
-		if (/* var access usr is in params and is normal variable read/write */
-		    (var_access->type == VarAccess_Read || var_access->type == VarAccess_Write) &&
-		    aos_contains_string(func_info->params, var_access->usr)) {
-			var_access->type = VarAccess_Null;
-		}
 	}
 
 	// Recurse
@@ -676,7 +686,7 @@ void unwind_func_info(FuncInfo *func_info,
  * of all variable accesses at func_info->access_footprint */
 void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footprint) 
 {
-	if (func_info->in_system_header)
+	if (func_info->in_system_header || !func_info->has_definition)
 		return;
 
 	if (func_info->callees) {
@@ -812,6 +822,7 @@ void trace_va_overlap(FuncInfo *func_info,
 			VarAccess *working_va = &func_info->var_accesses->data[i];
 			if (equal_var_access_structs(var_access, working_va)) {
 				print_call_trace(func_info, var_access, call_trace);
+				return;
 			}
 		}
 	}

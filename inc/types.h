@@ -83,6 +83,7 @@ struct FuncInfo {
 
 	bool in_system_header;	// Is function definition inside of
 				// system header?
+	bool has_definition;	// We couldn't find the function defnition
 };
 
 typedef struct {

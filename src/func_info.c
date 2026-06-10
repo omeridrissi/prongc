@@ -12,7 +12,8 @@ FuncInfo empty_func_info_global = {0};
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
 			 const char *elem_name,
-			 bool in_system_header)
+			 bool in_system_header,
+			 bool has_definition)
 {
 	FuncInfo *func_info;
 	func_info = malloc(sizeof(*func_info));
@@ -31,6 +32,7 @@ FuncInfo *init_func_info(CXCursor *cursor,
 	func_info->callees = NULL;
 
 	func_info->in_system_header = in_system_header;
+	func_info->has_definition = has_definition;
 
 	func_info->params = init_aos();
 	func_info->locals = init_aos();
@@ -60,12 +62,14 @@ bool func_info_is_null(FuncInfo *func_info) {
 
 void push_func_info(FuncInfoArr *func_info_array,
 		    CXCursor *cursor, const char *usr,
-		    const char *elem_name, bool in_system_header)
+		    const char *elem_name, bool in_system_header,
+		    bool has_definition)
 {
 	FuncInfo *func_info = init_func_info(cursor,
 					     usr,
 					     elem_name,
-					     in_system_header);
+					     in_system_header,
+					     has_definition);
 
 	if ((func_info_array->size+1)*sizeof(FuncInfo) > func_info_array->capacity) {
 		func_info_array->capacity *= 2;
@@ -134,7 +138,7 @@ FuncInfo *get_func_info_by_usr(FuncInfoArr *func_info_array, char *usr) {
 		if (strcmp(func_info_array->data[i].usr, usr) == 0)
 			return &func_info_array->data[i];
 	}
-	return get_null_func_info();
+	return NULL;
 }
 
 void print_func_info_array(FuncInfoArr *func_info_array, int depth)

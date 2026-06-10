@@ -19,7 +19,7 @@ DynamicAOS *init_aos(void)
 	array_struct = malloc(sizeof(*array_struct));
 
 	array_struct->data = (char*)malloc(sizeof(char)*AOS_INITIAL_CAP);
-	array_struct->strings = (char**)malloc(sizeof(char)*AOS_MAX_STR_COUNT);
+	array_struct->strings = (char**)malloc(sizeof(char*)*AOS_MAX_STR_COUNT);
 	array_struct->capacity = AOS_INITIAL_CAP;
 	array_struct->size = 0;
 	array_struct->count = 0;

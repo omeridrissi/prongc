@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 	
 	reset_aos(&client_data->touched_func_usrs);
 
-	// Done with this stage, probably won't need this anymore
+	//// Done with this stage, probably won't need this anymore
 	//if (arg_verbose) {
 	//	print_verbose("showing raw state...\n");
 
@@ -143,12 +143,13 @@ int main(int argc, char **argv)
 
 	//	print_func_info_array(client_data->funcs, 0);
 	//}
-	
+
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
 		const char *func_call = aos_string_at(client_data->func_names, i);
 		DynamicAOS *parsed_func_call = init_aos();
-
+		
 		parse_func_call(func_call, parsed_func_call);
+		
 		unwind_func_info(&client_data->funcs->data[i], client_data, parsed_func_call);
 
 		free_aos(parsed_func_call);
