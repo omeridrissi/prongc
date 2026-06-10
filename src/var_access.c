@@ -100,8 +100,8 @@ static bool va_array_contains(VarAccessArr *var_access_array, VarAccess *var_acc
 
 void push_access_copy(VarAccessArr *var_access_array, VarAccess *var_access)
 {
-	if (va_array_contains(var_access_array, var_access))
-		return;
+	//if (va_array_contains(var_access_array, var_access))
+	//	return;
 
 	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
 		var_access_array->capacity *= 2;
