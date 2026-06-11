@@ -1040,7 +1040,7 @@ error_t process_args(int argc, char **argv,
 }
 
 void print_usage(const char *prog_name) {
-    printf("Usage: %s --files=\"file1;file2;...\" --functions=\"func1(arg1, arg2);func2(arg1, arg2);...\" [OPTIONS]\n", prog_name);
+    printf("Usage: %s --files=\"file1;file2;...\" --functions=\"func1(arg1, arg2);func2(arg1, arg2);...\" [OPT ARGS] [clang ARGS]\n", prog_name);
     printf("\n");
     printf("Required arguments:\n");
     printf("  --files=LIST        Comma-separated list of input source files\n");

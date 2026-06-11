@@ -7,10 +7,14 @@ OBJ_DIR = build/obj
 BIN_DIR = build
 TARGET = $(BIN_DIR)/prongc
 
+# Installation paths
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+
 SRC := $(wildcard $(SRC_DIR)/*.c)
 OBJ := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
 
-.PHONY: all clean
+.PHONY: all clean rebuild install uninstall
 
 all: $(TARGET)
 
@@ -28,4 +32,13 @@ clean:
 
 rebuild: clean all
 
-.PHONY: all clean rebuild
+install: $(TARGET)
+	@echo "Installing prongc to $(DESTDIR)$(BINDIR)"
+	install -d $(DESTDIR)$(BINDIR)
+	install -m 755 $(TARGET) $(DESTDIR)$(BINDIR)/prongc
+	@echo "Installation complete. Run 'prongc'."
+
+uninstall:
+	@echo "Removing prongc from $(DESTDIR)$(BINDIR)"
+	rm -f $(DESTDIR)$(BINDIR)/prongc
+	@echo "Uninstall complete."
