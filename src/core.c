@@ -978,7 +978,7 @@ error_t parse_func_call(const char *input, DynamicAOS *out) {
 
 /* Turns semicolon-separated strings into a 
  * dynamic string array DynamicAOS */
-static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
+static void split_semicolon_list(char *str_in, DynamicAOS *dyn_aos)
 {
 	char *files_str_array = strdup(str_in);
 	char *temp = files_str_array;
@@ -987,6 +987,35 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 
 	while (temp[offset] != '\0') {
 		if (temp[offset] == ';') {
+			temp[offset] = '\0';
+			num_files++;
+		}
+		++offset;
+	}
+
+	for (size_t n = 0; n < num_files; ++n) {
+		// Skip leading whitespace
+		while (*temp == ' ' || *temp == '\t') temp++;
+		if (*temp != '\0') {
+			aos_push_string(dyn_aos, temp);
+		}
+		temp += strlen(temp) + 1;
+	}
+
+	free(files_str_array);
+}
+
+/* Turns semicolon-separated strings into a 
+ * dynamic string array DynamicAOS */
+static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
+{
+	char *files_str_array = strdup(str_in);
+	char *temp = files_str_array;
+	size_t num_files = 1;
+	size_t offset = 0;
+
+	while (temp[offset] != '\0') {
+		if (temp[offset] == ',') {
 			temp[offset] = '\0';
 			num_files++;
 		}
@@ -1022,7 +1051,7 @@ error_t process_args(int argc, char **argv,
 		if (strncmp(cmd_arg, "--files=", FILES_ARG_STRLEN) == 0) {
 			split_comma_list(cmd_arg+FILES_ARG_STRLEN, prong_priv->file_names);
 		} else if (strncmp(cmd_arg, "--functions=", FUNCS_ARG_STRLEN) == 0) {
-			split_comma_list(cmd_arg+FUNCS_ARG_STRLEN, prong_priv->func_names);
+			split_semicolon_list(cmd_arg+FUNCS_ARG_STRLEN, prong_priv->func_names);
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {
@@ -1040,11 +1069,15 @@ error_t process_args(int argc, char **argv,
 }
 
 void print_usage(const char *prog_name) {
-    printf("Usage: %s --files=\"file1;file2;...\" --functions=\"func1(arg1, arg2);func2(arg1, arg2);...\" [OPT ARGS] [clang ARGS]\n", prog_name);
+    printf("Usage: %s --files=\"file1,file2,...\" --functions=\"foo(arg1, arg2);bar(arg1, arg2);...\" [OPT ARGS] [clang ARGS]\n", prog_name);
     printf("\n");
     printf("Required arguments:\n");
-    printf("  --files=LIST        Comma-separated list of input source files\n");
-    printf("  --functions=LIST    Comma-separated list of function names\n");
+    printf("  --files=LIST        Semicolon-separated list of input source files\n");
+    printf("  --functions=LIST    Semicolon-separated list of function calls\n");
+    printf("\n");
+    printf("Function call format:\n");
+    printf("  foo(arg1, arg2, shared_arg)\n\n");
+    printf("  bar(shared_arg, arg3, arg4)\n");
     printf("\n");
     printf("Optional arguments:\n");
     printf("  --verbose           Enable verbose output\n");
