@@ -1084,7 +1084,7 @@ void print_usage(const char *prog_name) {
     printf("  --help              Show this help message and exit\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s --files=main.c,util.c --functions=init,run\n", prog_name);
-    printf("  %s --files=a.c,b.c,c.c --functions=foo,bar --verbose\n", prog_name);
+    printf("  %s --files=\"main.c,util.c\" --functions=\"init();run(arg)\"\n", prog_name);
+    printf("  %s --files=\"a.c,b.c,c.c\" --functions=\"foo(arg);bar(arg)\" --verbose\n", prog_name);
 }
 
