@@ -96,6 +96,13 @@ void print_func_info(FuncInfo *func_info, int indentation)
 	printf("%*s|_ local vars: ", x, "");
 	aos_print_strings(func_info->locals);
 	printf("\n");
+
+	if (func_info->has_definition) {
+		printf("%*s|_ has definition: true\n", x, "");
+	} else {
+		printf("%*s|_ has definition: false\n", x, "");
+	}
+
 	if (func_info->in_system_header) {
 		printf("%*s|_ is in system header: true\n", x, "");
 		return;

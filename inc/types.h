@@ -96,6 +96,7 @@ typedef struct {
  * state and contain various types of data that
  * our program will collect and use over time */
 struct prong_priv {
+	CXTranslationUnit *tu_array;	// Translation unit array
 	DynamicAOS	*func_names;	// The func names we get from cmdline
 	DynamicAOS	*file_names;	// The file names we get from cmdline
 	DynamicAOS	*clang_args;	// Arguments to be passed to libclang

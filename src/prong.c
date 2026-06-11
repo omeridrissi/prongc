@@ -58,14 +58,15 @@ int main(int argc, char **argv)
 
 	CXIndex index = clang_createIndex(0, 0);
 
-	CXTranslationUnit *tu_array = alloc_tu_array(client_data->file_names->count);
-	if (!tu_array) {
+	client_data->tu_array = alloc_tu_array(client_data->file_names->count);
+
+	if (!client_data->tu_array) {
 		ret = ERR_OUT_OF_MEMORY;
 		goto free_priv;
 	}
 
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
-		tu_array[i] = clang_parseTranslationUnit(
+		client_data->tu_array[i] = clang_parseTranslationUnit(
 			index,
 			aos_string_at(client_data->file_names, i), 
 			(const char * const*)client_data->clang_args->strings,
@@ -74,20 +75,20 @@ int main(int argc, char **argv)
 			CXTranslationUnit_None
 		);
 		
-		if (!tu_array[i]) {
+		if (!client_data->tu_array[i]) {
 			print_error("Unable to parse translation unit. Quitting.\n");
 			ret = ERR_TU; // it didn't find the file or whatever
 			goto free_tu_array;
 		}
 
-		size_t num_diagnostics = clang_getNumDiagnostics(tu_array[i]);
+		size_t num_diagnostics = clang_getNumDiagnostics(client_data->tu_array[i]);
 		bool has_error = false;
 		
 		if (num_diagnostics == 0)
 			continue;
 
 		for (size_t j = 0; j < num_diagnostics; ++j) {
-			CXDiagnostic diag = clang_getDiagnostic(tu_array[i], j);
+			CXDiagnostic diag = clang_getDiagnostic(client_data->tu_array[i], j);
 			enum CXDiagnosticSeverity diag_severity = 
 					clang_getDiagnosticSeverity(diag);
 			CXString formatted;
@@ -119,7 +120,7 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	process_tu_array(tu_array, client_data);
+	process_tu_array(client_data->tu_array, client_data);
 
 	if (client_data->funcs->size != client_data->func_names->count) {
 		print_error("Could not find some functions you were looking for.\n");
@@ -203,7 +204,8 @@ int main(int argc, char **argv)
 	}
 
 free_tu_array:
-	free_tu_array(tu_array, client_data->file_names->count);
+	if (client_data->tu_array)
+		free_tu_array(client_data->tu_array, client_data->file_names->count);
 
 free_priv:
 	prong_free_priv(client_data);

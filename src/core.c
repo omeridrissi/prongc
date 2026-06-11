@@ -446,9 +446,14 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		if (!clang_Cursor_isNull(callee_decl)) {
 			CXCursor working_cursor = callee_decl;
 
+			if (!clang_isCursorDefinition(working_cursor)) {
+				working_cursor = find_callexpr_definition(callee_decl, prong_priv);
+				if (clang_Cursor_isNull(working_cursor))
+					working_cursor = callee_decl;
+			}
+
 			CXString callee_usr = clang_getCursorUSR(working_cursor);
-			CXString callee_name = clang_getCursorDisplayName(working_cursor);
-		
+			CXString callee_name = clang_getCursorDisplayName(working_cursor);	
 
 			// Make sure we don't fall into an
 			// infinite recursion loop
@@ -704,50 +709,6 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	}
 }
 
-//static void print_call_trace(VarAccess *var_access, DynamicAOS *call_trace) 
-//{
-//	printf(CLR_FUNC);
-//	for (size_t i = 0; i < call_trace->count; ++i) {
-//		printf("%s%s %s->%s %s", call_trace->strings[i], 
-//				CLR_RESET, CLR_ARROW, CLR_RESET, CLR_FUNC);
-//	}
-//	printf(CLR_RESET);
-//	printf("%sline: %d, column: %d%s %s-------%s ", 
-//			CLR_LOC, var_access->line, var_access->column, CLR_RESET,
-//			CLR_ARROW, CLR_RESET);
-//
-//	printf(CLR_READ);
-//	switch (var_access->type) {
-//		case VarAccess_Read:
-//			printf("READ");
-//			break;
-//		case VarAccess_Write:
-//			printf("WRITE");
-//			break;
-//		case VarAccess_PtrRead:
-//			printf("READ FROM ADDR");
-//			break;
-//		case VarAccess_PtrWrite:
-//			printf("WRITE TO ADDR");
-//			break;
-//		case VarAccess_Escape:
-//			printf("escaped (possibly bug)");
-//			break;
-//		case VarAccess_Null:
-//			printf("NULL");
-//			break;
-//	}
-//	printf("%s: ", CLR_RESET);
-//
-//	printf(CLR_VAR);
-//	printf("%s ", var_access->name);
-//	printf(CLR_RESET);
-//	if (var_access->is_ptr_type)
-//		printf("(ptr)\n");
-//	else
-//		printf("\n");
-//}
-
 static void print_call_trace(FuncInfo *func_info,
 			     VarAccess *var_access, 
 			     DynamicAOS *call_trace) 
@@ -817,12 +778,15 @@ void trace_va_overlap(FuncInfo *func_info,
 {
 	aos_push_string(call_trace, func_info->name);
 
+	if (func_info->in_system_header || !func_info->has_definition)
+		goto end_recursion;
+
 	if (func_info->var_accesses) {
 		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 			VarAccess *working_va = &func_info->var_accesses->data[i];
 			if (equal_var_access_structs(var_access, working_va)) {
 				print_call_trace(func_info, var_access, call_trace);
-				return;
+				break;
 			}
 		}
 	}
@@ -835,6 +799,7 @@ void trace_va_overlap(FuncInfo *func_info,
 		}
 	}
 
+end_recursion:
 	aos_pop_string(call_trace);
 }
 

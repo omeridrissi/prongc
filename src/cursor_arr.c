@@ -159,27 +159,6 @@ CXCursor get_binop_assignment(CXCursorArr *stack)
 	return clang_getNullCursor();
 }
 
-ClosestAncestorResult find_closest_ancestor(CXCursorArr *stack,
-					    enum CXCursorKind *kinds,
-					    size_t num_kinds)
-{
-	ClosestAncestorResult res = {.found = false, .offset = ANCESTOR_NOT_FOUND};
-
-	for (size_t i = stack->size-1; i < stack->size; --i) {
-		for (size_t j = 0; j < num_kinds; j++) {
-			if (clang_getCursorKind(stack->data[i]) == kinds[j]) {
-				res.found = true;
-				res.cursor = stack->data[i];
-				res.offset = stack->size - i;
-				res.kind = kinds[j];
-				return res;
-			}
-		}
-	}
-
-	return res;
-}
-
 /* Traverses the array in reverse, and returns
  * base offest since. A cursor's base offset inside
  * the ancestry stack is it's index from the 
@@ -221,6 +200,58 @@ CXCursor get_cursor_by_offset(CXCursorArr *stack, size_t offset)
 /* Get the top of the cursor stack or 'tail' of cursor array */
 CXCursor get_cursor_array_tail(CXCursorArr *cursor_array) {
 	return cursor_array->data[cursor_array->size-1];
+}
+
+typedef struct {
+	CXCursor callexpr_cursor;
+	CXCursor callexpr_def;
+} SearchContext;
+
+static enum CXChildVisitResult find_call_definition_visitor(CXCursor cursor, 
+							    CXCursor parent,
+							    CXClientData data)
+{
+	(void)parent;
+	SearchContext *pair = (SearchContext*)data;
+
+	if (clang_getCursorKind(cursor) == CXCursor_FunctionDecl) {
+		CXString cursor_usr = clang_getCursorUSR(cursor);
+		CXString callexpr_usr = clang_getCursorUSR(pair->callexpr_cursor);
+
+		if (clang_isCursorDefinition(cursor) &&
+		    strcmp(clang_getCString(callexpr_usr), clang_getCString(cursor_usr)) == 0) {
+			pair->callexpr_def = cursor;
+			clang_disposeString(cursor_usr);
+			clang_disposeString(callexpr_usr);
+			return CXChildVisit_Break;
+		}
+		
+		clang_disposeString(cursor_usr);
+		clang_disposeString(callexpr_usr);
+	}
+
+	return CXChildVisit_Continue;
+}
+/* Finds a CallExpr's definition cursor accross all translation units */
+/* This is only used when looking for a definition that's beyond current
+ * TU's scope */
+CXCursor find_callexpr_definition(CXCursor callexpr_cursor, 
+				  struct prong_priv *client_data)
+{
+	CXCursor callexpr_def = clang_getNullCursor();
+
+	SearchContext pair = {
+		.callexpr_cursor = callexpr_cursor,
+		.callexpr_def = callexpr_def,
+	};
+
+	for (size_t i = 0; i < client_data->file_names->count; ++i) {
+		CXCursor tu_cursor = clang_getTranslationUnitCursor(client_data->tu_array[i]);
+
+		clang_visitChildren(tu_cursor, find_call_definition_visitor, &pair);
+	}
+
+	return pair.callexpr_def;
 }
 
 size_t get_param_idx(CXCursor call_expr, 

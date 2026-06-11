@@ -38,6 +38,9 @@ size_t		get_cursor_offset_of_kind(CXCursorArr *array, enum CXCursorKind target_k
 size_t		get_binop_assignment_offset(CXCursorArr *stack);
 CXCursor	get_cursor_by_offset(CXCursorArr *stack, size_t offset);
 
+CXCursor find_callexpr_definition(CXCursor callexpr_cursor, 
+				  struct prong_priv *client_data);
+
 CXCursor	get_cursor_array_tail(CXCursorArr *cursor_array);
 
 size_t get_param_idx(CXCursor call_expr, CXCursorArr *stack);
