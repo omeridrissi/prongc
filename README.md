@@ -18,7 +18,7 @@ sudo make uninstall
 make clean
 
 # Run
-prongc --files="file1.c;file2.c;..." \
+prongc --files="file1.c,file2.c,..." \
        --functions="foo(arg1, arg2);bar(arg1, arg2);..." \
         [OPT ARGS] [CLANG ARGS]
 ```
