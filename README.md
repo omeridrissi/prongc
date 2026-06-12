@@ -5,6 +5,10 @@ invocations with symbolic arguments and the files where the specified functions 
 it identifies all shared variable accesses between them without requiring a build system, compilation
 database, or whole-program analysis.
 
+## Dependencies
+
+prongC only depends on llvm-21, which you can install here: https://apt.llvm.org/
+
 ## Usage
 
 ```bash
