@@ -28,6 +28,8 @@ Make sure that the shared arguments are of the same type, since prongc doesn't c
 Make sure that each non-shared arguments in both function calls has a unique name, otherwise it's
 going to be treated as a shared argument by prongc.
 
+Recommended: Give the arguments the same names of the parameters in the function definitions.
+
 ## Output example
 
 ```c
