@@ -10,6 +10,10 @@ database, or whole-program analysis.
 ```bash
 # Build
 make
+# Install
+sudo make install
+# Uninstall
+sudo make uninstall
 # Clean up
 make clean
 
