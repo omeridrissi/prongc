@@ -14,7 +14,9 @@ make
 make clean
 
 # Run
-./build/prongc --files="file1.c;file2.c;..." --functions="foo(arg1, arg2);bar(arg1, arg2);..." [OPTIONS]
+./build/prongc --files="file1.c;file2.c;..." \
+               --functions="foo(arg1, arg2);bar(arg1, arg2);..." \
+               [OPT ARGS] [CLANG ARGS]
 ```
 Command line function name format:
 
