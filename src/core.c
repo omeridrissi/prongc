@@ -1037,7 +1037,7 @@ void print_usage(const char *prog_name) {
     printf("Usage: %s --files=\"file1,file2,...\" --functions=\"foo(arg1, arg2);bar(arg1, arg2);...\" [OPT ARGS] [clang ARGS]\n", prog_name);
     printf("\n");
     printf("Required arguments:\n");
-    printf("  --files=LIST        Semicolon-separated list of input source files\n");
+    printf("  --files=LIST        Comma-separated list of input source files\n");
     printf("  --functions=LIST    Semicolon-separated list of function calls\n");
     printf("\n");
     printf("Function call format:\n");
