@@ -45,6 +45,10 @@ int main(int argc, char **argv)
 	aos_print_strings(client_data->func_names);
 	printf("\n");
 
+	printf("%s[info]%s parsing files: ", CLR_VAR, CLR_RESET);
+	aos_print_strings(client_data->file_names);
+	printf("\n");
+
 	if (client_data->func_names->count < 2) {
 		print_error("Need multiple functions for variable overlap tracing\n");
 		print_usage(argv[0]);
