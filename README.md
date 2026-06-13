@@ -1,9 +1,16 @@
 # prongC
 
-prongC performs call-site-driven interprocedural data flow overlap detection. Given two function
-invocations with symbolic arguments and the files where the specified functions were defined, 
-it identifies all shared variable accesses between them without requiring a build system, compilation
-database, or whole-program analysis.
+prongC is a static analysis tool for C that detects shared variable accesses between 
+function calls.
+
+Given two or more function invocations with symbolic arguments, prongC traces how variables
+are used through the program and identifies variables that are read or modified in multiple
+source code locations.
+
+Unlike many code-analysis tools, prongC does not require a build system, compilation database,
+or whole-program analysis. It works directly from source files and function invocations, 
+making it useful for exploring large codebases, auditing side effects, analyzing call ordering,
+and investigating hidden data dependencies.
 
 ## Dependencies
 
@@ -53,6 +60,16 @@ bar(bool shared_arg, size_t arg3) → file1.c, line: 699, col: 25  │ READ : sh
               ^
 -------------------
 ```
+
+## Use cases
+
+- Detect hidden shared state between functions
+- Verify whether function calls can be safely reordered
+- Investigate side effects in legacy C code
+- Analyze Linux kernel and driver code
+- Explore data dependencies across files
+- Identify overlapping reads and writes
+- Understand unfamiliar codebases faster
 
 ## Project Inspiration
 
