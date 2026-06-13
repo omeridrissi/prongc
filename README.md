@@ -20,13 +20,10 @@ prongC only depends on llvm-21, which you can install here: https://apt.llvm.org
 
 ```bash
 # Build
+autoreconf -i
+cd build/
+../configure
 make
-# Install
-sudo make install
-# Uninstall
-sudo make uninstall
-# Clean up
-make clean
 
 # Run
 prongc --files="file1.c,file2.c,..." \

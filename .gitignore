@@ -1,3 +1,13 @@
+src/.dirstamp
+src/.deps/*
+depcomp
+aclocal.m4
+install-sh
+Makefile.in
+autom4te.cache
+compile
+missing
+configure
 build/*
 code_sample/*
 *.o
