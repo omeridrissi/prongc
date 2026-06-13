@@ -71,7 +71,7 @@ bar(bool shared_arg, size_t arg3) → file1.c, line: 699, col: 25  │ READ : sh
 - Identify overlapping reads and writes
 - Understand unfamiliar codebases faster
 
-## Project Inspiration
+## Why I made this
 
 While digging through kernel staging driver code, I kept getting lost in messy, tangled functions 
 that silently shared and modified the same data across files. This caused some pain when trying to
