@@ -64,7 +64,7 @@ static void aos_update_old_strings(DynamicAOS *array, char *old_data) {
 
 /* Push string on top of the array, automatically 
  * realloc if not enough size */
-error_t aos_push_string(DynamicAOS *array, const char *str)
+prong_error_t aos_push_string(DynamicAOS *array, const char *str)
 {
 	size_t str_size = strlen(str)+1;
 
@@ -94,7 +94,7 @@ bounds_check:
 }
 
 /* Pop */
-error_t aos_pop_string(DynamicAOS *array) {
+prong_error_t aos_pop_string(DynamicAOS *array) {
 	if (array->count == 0)
 		return ERR_AOS_EMPTY;
 	

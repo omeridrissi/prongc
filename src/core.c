@@ -866,7 +866,7 @@ void prong_free_priv(struct prong_priv *prong_priv)
 /* Takes "input" in the format of "foo(arg1, arg2, ...)" and
  * pushes function name, argument names in order to external
  * DynamicAOS "out" in the format of ["foo", "arg1", "arg2", ...] */
-error_t parse_func_call(const char *input, DynamicAOS *out) {
+prong_error_t parse_func_call(const char *input, DynamicAOS *out) {
 	if (!input || !out) return ERR_INVALID_ARG;
 	
 //	size_t len = strlen(input);
@@ -1005,7 +1005,7 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 /* Take the necessary information provided in command line
  * and save it in state (prong_priv/client_data struct) 
  * I hate processing strings */
-error_t process_args(int argc, char **argv, 
+prong_error_t process_args(int argc, char **argv, 
 		  struct prong_priv *prong_priv)
 {
 	char *cmd_arg;

@@ -31,9 +31,9 @@ void trace_va_overlap(FuncInfo *func_info,
 struct prong_priv *prong_init_priv();
 void prong_free_priv(struct prong_priv *prong_priv);
 
-error_t parse_func_call(const char *input, DynamicAOS *out);
+prong_error_t parse_func_call(const char *input, DynamicAOS *out);
 
-error_t process_args(int argc, char **argv, 
+prong_error_t process_args(int argc, char **argv, 
 		     struct prong_priv *prong_priv);
 
 void print_usage(const char *prog_name);

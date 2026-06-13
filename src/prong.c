@@ -16,7 +16,7 @@ bool arg_help = false;
 int main(int argc, char **argv) 
 {
 	struct prong_priv *client_data;
-	error_t ret = ERR_OK;
+	prong_error_t ret = ERR_OK;
 
 	if (argc < 2) {
 		print_usage(argv[0]);

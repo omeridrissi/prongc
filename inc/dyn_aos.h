@@ -17,8 +17,8 @@ DynamicAOS	*init_aos(void);
 void		free_aos(DynamicAOS *array);
 void		reset_aos(DynamicAOS **array);
 
-error_t		aos_push_string(DynamicAOS *array, const char *str);
-error_t		aos_pop_string(DynamicAOS *array);
+prong_error_t		aos_push_string(DynamicAOS *array, const char *str);
+prong_error_t		aos_pop_string(DynamicAOS *array);
 
 ssize_t		aos_string_count(DynamicAOS *array);
 bool		aos_contains_string(DynamicAOS *array, const char *needle);

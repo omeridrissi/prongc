@@ -20,7 +20,7 @@ typedef enum {
 	ERR_OUT_OF_MEMORY,
 	ERR_AOS_EMPTY,
 	ERR_IO
-} error_t;
+} prong_error_t;
 
 /* Variable access types */
 typedef enum {
@@ -116,6 +116,6 @@ struct prong_priv {
 	DynamicAOS	*touched_func_usrs; // List of processed funcs
 
 	/* Visitor function error return */
-	error_t		err;		
+	prong_error_t		err;		
 };
 
