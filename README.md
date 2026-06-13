@@ -21,8 +21,7 @@ prongC only depends on llvm-21, which you can install here: https://apt.llvm.org
 ```bash
 # Build
 autoreconf -i
-cd build/
-../configure
+./configure
 make
 
 # Run
