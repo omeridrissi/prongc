@@ -69,6 +69,7 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
+	size_t tu_count = client_data->file_names->count;
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
 		client_data->tu_array[i] = clang_parseTranslationUnit(
 			index,
@@ -118,8 +119,9 @@ int main(int argc, char **argv)
 		}
 
 		if (has_error) {
-			print_error("Errors detected parsing TU %d\n", i);
+			print_error("Errors detected parsing translation unit %zu\n", i);
 			ret = ERR_SYNTAX;
+			tu_count = i;
 			goto free_tu_array;
 		}
 	}
@@ -209,7 +211,7 @@ int main(int argc, char **argv)
 
 free_tu_array:
 	if (client_data->tu_array)
-		free_tu_array(client_data->tu_array, client_data->file_names->count);
+		free_tu_array(client_data->tu_array, tu_count);
 
 free_priv:
 	prong_free_priv(client_data);
