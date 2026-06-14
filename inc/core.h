@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <glob.h>
 #include <clang-c/Index.h>
 #include "types.h"
 

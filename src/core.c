@@ -970,6 +970,16 @@ static void split_semicolon_list(char *str_in, DynamicAOS *dyn_aos)
 	free(files_str_array);
 }
 
+/* Error function called by glob on error */
+static int glob_errfunc(const char *epath, int eerrno)
+{
+	const char *err_msg = strerror(eerrno);
+
+	print_error("pattern match error: %s: %s\n", epath, err_msg);
+
+	return 0;
+}
+
 /* Turns semicolon-separated strings into a 
  * dynamic string array DynamicAOS */
 static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
@@ -991,7 +1001,24 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 		// Skip leading whitespace
 		while (*temp == ' ' || *temp == '\t') temp++;
 		if (*temp != '\0') {
-			aos_push_string(dyn_aos, temp);
+			glob_t pglob;
+			int flags = GLOB_NOSORT | GLOB_PERIOD | GLOB_BRACE | GLOB_TILDE_CHECK;
+
+			int glob_ret = glob(temp, flags, glob_errfunc, &pglob);
+
+			if (glob_ret == 0) {
+				for (size_t i = 0; i < pglob.gl_pathc; ++i) {
+					aos_push_string(dyn_aos, pglob.gl_pathv[i]);
+				}
+			} else if (glob_ret == GLOB_NOSPACE) {
+				print_error("pattern match error: glob: out of memory\n");
+			} else if (glob_ret == GLOB_ABORTED) {
+				print_error("pattern match error: glob: aborted\n");
+			} else {
+				print_error("pattern match error: no matches found\n");
+			}
+
+			globfree(&pglob);
 		}
 		temp += strlen(temp) + 1;
 	}
