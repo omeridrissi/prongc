@@ -42,6 +42,7 @@ typedef enum {
 typedef struct {
 	char		*usr;
 	char		*name;
+	char		*parent_func_name; // Reference to function name, not freeable
 	char		*esc_func_usr; // Only if passed to function
 	size_t		esc_param_idx; // Paremeter idx when passed to func
 	int		line;
@@ -70,7 +71,8 @@ typedef struct {
 struct FuncInfo {
 	CXCursor	cursor;	// The FunctionDecl cursor itself
 	char		*usr;	// USR of current function
-	char		*name;	// Name of the element, for debug info
+	char		*name;	// Name of the cursor
+	char		*spelling; // just name without param types
 	DynamicAOS	*params;// USRs of parameters
 	DynamicAOS	*locals;// USRs for local VarDecls
 	
@@ -100,6 +102,9 @@ struct prong_priv {
 	CXTranslationUnit *tu_array;	// Translation unit array
 	DynamicAOS	*func_names;	// The func names we get from cmdline
 	DynamicAOS	*file_names;	// The file names we get from cmdline
+	DynamicAOS	*trace_var_names;// Function parameters or global variables 
+					// to trace exclusively
+	DynamicAOS	*trace_usrs;	// USRs of variables to trace exclusively
 	DynamicAOS	*clang_args;	// Arguments to be passed to libclang
 
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables

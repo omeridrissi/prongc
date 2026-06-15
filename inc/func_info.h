@@ -17,6 +17,7 @@ extern FuncInfo empty_func_info_global;
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
 			 const char *elem_name,
+			 const char *spelling,
 			 bool in_system_header,
 			 bool has_definition);
 void free_func_info(FuncInfo *func_info);
@@ -28,6 +29,7 @@ void push_func_info(FuncInfoArr *func_info_array,
 		    CXCursor *cursor,
 		    const char *usr, 
 		    const char *elem_name,
+		    const char *spelling,
 		    bool in_system_header,
 		    bool has_definition);
 

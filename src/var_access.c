@@ -5,7 +5,8 @@
 #define NO_IDX SIZE_MAX
 
 VarAccess *init_var_access(const char *usr, const char *name,
-			   const char *esc_func_usr, size_t esc_param_idx,
+			   const char *esc_func_usr, char *parent_func_name,
+			   size_t esc_param_idx,
 			   int line, int column, VarAccessType type,
 			   bool is_ptr_type)
 {
@@ -17,6 +18,8 @@ VarAccess *init_var_access(const char *usr, const char *name,
 
 	if (name != NULL)
 		var_access->name = strdup(name);
+
+	var_access->parent_func_name = parent_func_name;
 
 	var_access->line = line;
 	var_access->column = column;
@@ -64,12 +67,13 @@ void free_var_access_array(VarAccessArr *var_access_array)
 
 void push_var_access(VarAccessArr *var_access_array,
 			const char *usr, const char *name, 
-			const char *esc_func_usr, size_t esc_param_idx, 
+			const char *esc_func_usr, char *parent_func_name,
+			size_t esc_param_idx, 
 			int line, int column, VarAccessType type,
 			bool is_ptr_type)
 {
 	VarAccess *var_access = init_var_access(usr, name, 
-						esc_func_usr, 
+						esc_func_usr, parent_func_name,
 						esc_param_idx, line,
 						column, type, is_ptr_type);
 

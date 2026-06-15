@@ -70,11 +70,12 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 						      clang_getCString(cursor_usr));
 	
 				}
-				
+			
 				push_func_info(prong_priv->funcs,
 						&parent_cursor,
 						clang_getCString(cursor_usr),
 						clang_getCString(parent_display_name),
+						clang_getCString(parent_spelling),
 						false, true);
 	
 				clang_disposeString(cursor_usr);
@@ -245,6 +246,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 							clang_getCString(decl_usr),
 							clang_getCString(decl_name),
 							clang_getCString(callexpr_usr),
+							current_func->spelling,
 							param_idx,
 							current_line, current_column, 
 							VarAccess_Escape, is_ptr_type);
@@ -256,6 +258,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 							clang_getCString(decl_usr),
 							clang_getCString(decl_name),
 							clang_getCString(callexpr_usr),
+							current_func->spelling,
 							param_idx, current_line, current_column, 
 							VarAccess_Read, is_ptr_type);
 				}
@@ -267,7 +270,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
 						clang_getCString(callexpr_usr),
-						param_idx, 
+						current_func->spelling, param_idx, 
 						current_line, current_column, 
 						VarAccess_Escape, is_ptr_type);
 				
@@ -279,6 +282,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
 						clang_getCString(callexpr_usr),
+						current_func->spelling,
 						param_idx, current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -302,7 +306,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						push_var_access(current_func->var_accesses,
 								clang_getCString(decl_usr),
 								clang_getCString(decl_name),
-								NULL, NO_IDX, 
+								NULL, current_func->spelling, NO_IDX, 
 								current_line, current_column, 
 								VarAccess_PtrWrite, is_ptr_type);
 					} else {
@@ -310,7 +314,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						push_var_access(current_func->var_accesses,
 								clang_getCString(decl_usr),
 								clang_getCString(decl_name),
-								NULL, NO_IDX,
+								NULL, current_func->spelling, NO_IDX,
 								current_line, current_column, 
 								VarAccess_PtrRead, is_ptr_type);
 					}	
@@ -320,7 +324,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						NULL, NO_IDX,
+						NULL, current_func->spelling, NO_IDX,
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -347,14 +351,14 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 							push_var_access(current_func->var_accesses,
 									clang_getCString(decl_usr),
 									clang_getCString(decl_name),
-									NULL, NO_IDX,
+									NULL, current_func->spelling, NO_IDX,
 									current_line, current_column, 
 									VarAccess_PtrWrite, is_ptr_type);	
 						} else {
 							push_var_access(current_func->var_accesses,
 									clang_getCString(decl_usr),
 									clang_getCString(decl_name),
-									NULL, NO_IDX,
+									NULL, current_func->spelling, NO_IDX,
 									current_line, current_column, 
 									VarAccess_Read, is_ptr_type);
 						}
@@ -363,7 +367,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						push_var_access(current_func->var_accesses,
 								clang_getCString(decl_usr),
 								clang_getCString(decl_name),
-								NULL, NO_IDX,
+								NULL, current_func->spelling, NO_IDX,
 								current_line, current_column, 
 								VarAccess_PtrRead, is_ptr_type);
 					}
@@ -371,7 +375,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					push_var_access(current_func->var_accesses,
 							clang_getCString(decl_usr),
 							clang_getCString(decl_name),
-							NULL, NO_IDX,
+							NULL, current_func->spelling, NO_IDX,
 							current_line, current_column, 
 							VarAccess_PtrRead, is_ptr_type);
 				}
@@ -383,7 +387,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						NULL, NO_IDX, 
+						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Write, is_ptr_type);
 			} else {
@@ -391,7 +395,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						NULL, NO_IDX, 
+						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -408,7 +412,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						NULL, NO_IDX, 
+						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Write, is_ptr_type);
 			} else {
@@ -416,7 +420,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						clang_getCString(decl_usr),
 						clang_getCString(decl_name),
-						NULL, NO_IDX, 
+						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -425,7 +429,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			push_var_access(current_func->var_accesses,
 					clang_getCString(decl_usr),
 					clang_getCString(decl_name),
-					NULL, NO_IDX, 
+					NULL, current_func->spelling, NO_IDX, 
 					current_line, current_column, 
 					VarAccess_Read, is_ptr_type);
 
@@ -454,6 +458,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 
 			CXString callee_usr = clang_getCursorUSR(working_cursor);
 			CXString callee_name = clang_getCursorDisplayName(working_cursor);	
+			CXString callee_spelling = clang_getCursorSpelling(working_cursor);
 
 			// Make sure we don't fall into an
 			// infinite recursion loop
@@ -475,16 +480,18 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			
 			CXSourceLocation callee_location = 
 				clang_getCursorLocation(working_cursor);
-			
+				
 			
 			push_func_info(
 				prong_priv->current_func->callees,
 				&working_cursor,
 				clang_getCString(callee_usr),
 				clang_getCString(callee_name),
+				clang_getCString(callee_spelling),
 				clang_Location_isInSystemHeader(callee_location),
 				clang_isCursorDefinition(working_cursor));
-			
+		
+			clang_disposeString(callee_spelling);
 			clang_disposeString(callee_usr);
 			clang_disposeString(callee_name);
 			
@@ -803,6 +810,101 @@ end_recursion:
 	aos_pop_string(call_trace);
 }
 
+void find_va_overlap(FuncInfo *func_info_i, 
+		     FuncInfo *func_info_j,
+		     struct prong_priv *prong_priv)
+{
+	for (size_t k = 0; k < func_info_i->access_footprint->size; ++k) {
+		for (size_t l = 0; l < func_info_j->access_footprint->size; ++l) {
+			VarAccess *va_k = &func_info_i->access_footprint->data[k];
+			VarAccess *va_l = &func_info_j->access_footprint->data[l];
+
+			if (va_k->type != VarAccess_Null && va_l->type != VarAccess_Null) {
+				if (equal_var_accesses(va_k, va_l)) {
+					DynamicAOS *call_trace = init_aos();
+					printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
+					trace_va_overlap(func_info_i, va_k, call_trace);
+					reset_aos(&call_trace);
+					trace_va_overlap(func_info_j, va_l, call_trace);
+					printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
+					va_k->type = VarAccess_Null;
+					va_l->type = VarAccess_Null;
+					free_aos(call_trace);
+					goto loop_end;
+				}
+			}
+
+loop_end:
+		}
+	}
+
+}
+
+char *mark_postfix_func_name(char *postfix, char **arg_name) {
+	char *split_postfix = strdup(postfix);
+	size_t i = 0;
+	while (split_postfix[i] != '\0') {
+		if (split_postfix[i] == '@') {
+			split_postfix[i] = '\0';
+			*arg_name = split_postfix+i+1;
+			return split_postfix;
+		}
+		i++;
+	}
+	free(split_postfix);
+	return NULL;
+}
+
+void find_exclusive_va_names(FuncInfo *func_info, struct prong_priv *client_data) 
+{
+	for (size_t k = 0; k < func_info->access_footprint->size; ++k) {
+		VarAccess *va_k = &func_info->access_footprint->data[k];
+		for (size_t i = 0; i < client_data->trace_var_names->count; ++i) {
+			char *postfix = client_data->trace_var_names->strings[i];
+			char *arg_name;
+			char *split_postfix = mark_postfix_func_name(postfix, &arg_name);
+			if (split_postfix) {
+				if (strcmp(split_postfix, va_k->parent_func_name) == 0) {
+					if (strcmp(arg_name, va_k->name) == 0) {
+						DynamicAOS *call_trace = init_aos();
+						printf("%sTracing %s:%s\n", CLR_VAR, postfix, CLR_RESET);
+						trace_va_overlap(func_info, va_k, call_trace);
+						printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
+						va_k->type = VarAccess_Null;
+						free_aos(call_trace);
+					}
+				}
+			} else {
+				if (strcmp(postfix, va_k->name) == 0 &&
+				    aos_contains_string(client_data->global_usrs, va_k->usr)) {
+					DynamicAOS *call_trace = init_aos();
+					printf("%sTracing %s:%s\n", CLR_VAR, postfix, CLR_RESET);
+					trace_va_overlap(func_info, va_k, call_trace);
+					printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
+					va_k->type = VarAccess_Null;
+					free_aos(call_trace);
+				}
+			}
+			free(split_postfix);
+		}
+	}
+	
+}
+bool is_usr_param_postfix(const char *usr, const char *param_name) {
+	size_t usr_len = strlen(usr);
+	size_t param_len = strlen(param_name);
+
+	if (param_len > usr_len) return false;
+
+	// Check if usr ends with param_name
+	if (strcmp(usr + usr_len - param_len, param_name) != 0) return false;
+
+	// Ensure the character before param_name is '@' (USR separator)
+	if (usr_len > param_len && usr[usr_len - param_len - 1] != '@') return false;
+
+	return true;
+}
+
 /* Initializes the state we're going to be
  * working with. Zeroes it out, but then allocates
  * and sets the dynamic string arrays corresponding
@@ -819,6 +921,8 @@ struct prong_priv *prong_init_priv()
 
 	prong_priv->func_names = init_aos();
 	prong_priv->file_names = init_aos();
+	prong_priv->trace_var_names = init_aos();
+
 	prong_priv->clang_args = init_aos();
 
 	prong_priv->global_usrs = init_aos();
@@ -841,6 +945,9 @@ void prong_free_priv(struct prong_priv *prong_priv)
 		free_aos(prong_priv->func_names);
 	if (prong_priv->file_names)
 		free_aos(prong_priv->file_names);
+
+	if (prong_priv->trace_var_names)
+		free_aos(prong_priv->trace_var_names);
 
 	if (prong_priv->clang_args)
 		free_aos(prong_priv->clang_args);
@@ -879,7 +986,7 @@ prong_error_t parse_func_call(const char *input, DynamicAOS *out) {
 	// Trim trailing whitespace
 	const char *name_end = paren;
 	while (name_end > input && isspace((unsigned char)*(name_end - 1))) {
-	    name_end--;
+		name_end--;
 	}
 	
 	size_t name_len = name_end - input;
@@ -901,41 +1008,41 @@ prong_error_t parse_func_call(const char *input, DynamicAOS *out) {
 	// Parse comma-separated arguments
 	const char *cursor = args_start;
 	while (cursor < args_end) {
-	    // Skip leading whitespace
-	    while (cursor < args_end && isspace((unsigned char)*cursor)) {
-	        cursor++;
-	    }
-	    if (cursor >= args_end) break;
-	    
-	    // Find end of this argument (comma or closing paren)
-	    const char *arg_start = cursor;
-	    const char *arg_end = cursor;
-	    int depth = 0;  // Track nested parens for function pointer args
-	    
-	    while (cursor < args_end) {
-	        if (*cursor == '(') depth++;
-	        else if (*cursor == ')') depth--;
-	        else if (*cursor == ',' && depth == 0) break;
-	        cursor++;
-	    }
-	    arg_end = cursor;
-	    
-	    // Trim trailing whitespace from argument
-	    while (arg_end > arg_start && isspace((unsigned char)*(arg_end - 1))) {
-	        arg_end--;
-	    }
-	    
-	    if (arg_end > arg_start) {
-	        char *arg = strndup(arg_start, arg_end - arg_start);
-	        if (!arg) return ERR_OUT_OF_MEMORY;
-	        aos_push_string(out, arg);
-	        free(arg);
-	    }
-	    
-	    // Skip the comma
-	    if (cursor < args_end && *cursor == ',') {
-	        cursor++;
-	    }
+		// Skip leading whitespace
+		while (cursor < args_end && isspace((unsigned char)*cursor)) {
+			cursor++;
+		}
+		if (cursor >= args_end) break;
+		
+		// Find end of this argument (comma or closing paren)
+		const char *arg_start = cursor;
+		const char *arg_end = cursor;
+		int depth = 0;  // Track nested parens for function pointer args
+		
+		while (cursor < args_end) {
+			if (*cursor == '(') depth++;
+			else if (*cursor == ')') depth--;
+			else if (*cursor == ',' && depth == 0) break;
+			cursor++;
+		}
+		arg_end = cursor;
+		
+		// Trim trailing whitespace from argument
+		while (arg_end > arg_start && isspace((unsigned char)*(arg_end - 1))) {
+			arg_end--;
+		}
+		
+		if (arg_end > arg_start) {
+			char *arg = strndup(arg_start, arg_end - arg_start);
+			if (!arg) return ERR_OUT_OF_MEMORY;
+			aos_push_string(out, arg);
+			free(arg);
+		}
+		
+		// Skip the comma
+		if (cursor < args_end && *cursor == ',') {
+			cursor++;
+		}
 	}
 	
 	return ERR_OK;
@@ -1028,6 +1135,7 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 
 #define FILES_ARG_STRLEN 8
 #define FUNCS_ARG_STRLEN 12
+#define TRACE_VARS_STRLEN 8
 
 /* Take the necessary information provided in command line
  * and save it in state (prong_priv/client_data struct) 
@@ -1044,6 +1152,8 @@ prong_error_t process_args(int argc, char **argv,
 			split_comma_list(cmd_arg+FILES_ARG_STRLEN, prong_priv->file_names);
 		} else if (strncmp(cmd_arg, "--functions=", FUNCS_ARG_STRLEN) == 0) {
 			split_semicolon_list(cmd_arg+FUNCS_ARG_STRLEN, prong_priv->func_names);
+		} else if (strncmp(cmd_arg, "--trace=", TRACE_VARS_STRLEN) == 0) {
+			split_semicolon_list(cmd_arg+TRACE_VARS_STRLEN, prong_priv->trace_var_names);
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {

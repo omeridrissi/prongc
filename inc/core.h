@@ -29,6 +29,15 @@ void trace_va_overlap(FuncInfo *func_info,
 		      VarAccess *var_access,
 		      DynamicAOS *call_trace);
 
+void find_va_overlap(FuncInfo *func_info_i, 
+		     FuncInfo *func_info_j,
+		     struct prong_priv *prong_priv);
+
+char *mark_postfix_func_name(char *postfix, char **arg_name);
+void find_exclusive_va_names(FuncInfo *func_info, struct prong_priv *client_data);
+
+bool is_usr_param_postfix(const char *usr, const char *param_name);
+
 struct prong_priv *prong_init_priv();
 void prong_free_priv(struct prong_priv *prong_priv);
 

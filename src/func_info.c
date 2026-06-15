@@ -12,6 +12,7 @@ FuncInfo empty_func_info_global = {0};
 FuncInfo *init_func_info(CXCursor *cursor,
 			 const char *usr, 
 			 const char *elem_name,
+			 const char *spelling,
 			 bool in_system_header,
 			 bool has_definition)
 {
@@ -24,6 +25,8 @@ FuncInfo *init_func_info(CXCursor *cursor,
 		func_info->usr = strdup(usr);
 	if (elem_name != NULL)
 		func_info->name = strdup(elem_name);
+	if (spelling != NULL)
+		func_info->spelling = strdup(spelling);
 
 	if (cursor != NULL) {
 		func_info->cursor = *cursor;
@@ -62,12 +65,14 @@ bool func_info_is_null(FuncInfo *func_info) {
 
 void push_func_info(FuncInfoArr *func_info_array,
 		    CXCursor *cursor, const char *usr,
-		    const char *elem_name, bool in_system_header,
+		    const char *elem_name, const char *spelling,
+		    bool in_system_header,
 		    bool has_definition)
 {
 	FuncInfo *func_info = init_func_info(cursor,
 					     usr,
 					     elem_name,
+					     spelling,
 					     in_system_header,
 					     has_definition);
 

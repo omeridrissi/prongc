@@ -40,19 +40,20 @@ int main(int argc, char **argv)
 	printf("%s[info]%s using clang arguments: ", CLR_VAR, CLR_RESET);
 	aos_print_strings(client_data->clang_args);
 	printf("\n");
+
+	printf("%s[info]%s parsing files: ", CLR_VAR, CLR_RESET);
+	aos_print_strings(client_data->file_names);
+	printf("\n");
 	
 	printf("%s[info]%s searching function CXCursors: ", CLR_VAR, CLR_RESET);
 	aos_print_strings(client_data->func_names);
 	printf("\n");
 
-	printf("%s[info]%s parsing files: ", CLR_VAR, CLR_RESET);
-	aos_print_strings(client_data->file_names);
-	printf("\n");
+	if (client_data->trace_var_names) {
+		printf("%s[info]%s tracing variables: ", CLR_VAR, CLR_RESET);
+		aos_print_strings(client_data->trace_var_names);
+		printf("\n");
 
-	if (client_data->func_names->count < 2) {
-		print_error("Need multiple functions for variable overlap tracing\n");
-		print_usage(argv[0]);
-		goto free_priv;
 	}
 
 	if (arg_help) {
@@ -171,7 +172,14 @@ int main(int argc, char **argv)
 		build_var_access_footprint(working_func_info,
 					   working_func_info->access_footprint);
 	}
-	
+
+	if (client_data->trace_var_names) {
+		for (size_t f = 0; f < client_data->funcs->size; ++f) {
+			FuncInfo *func_info = &client_data->funcs->data[f];
+			find_exclusive_va_names(func_info, client_data);
+		}
+		goto free_tu_array;
+	}
 	// Messiest part :(
 	/* Basically checks if two FuncInfos contain the same VarAccess by
 	 * using the collection of all variable accesses from both functions 
@@ -183,29 +191,8 @@ int main(int argc, char **argv)
 
 			FuncInfo *func_info_i = &client_data->funcs->data[i];
 			FuncInfo *func_info_j = &client_data->funcs->data[j];
-
-			for (size_t k = 0; k < func_info_i->access_footprint->size; ++k) {
-				for (size_t l = 0; l < func_info_j->access_footprint->size; ++l) {
-					VarAccess *va_k = &func_info_i->access_footprint->data[k];
-					VarAccess *va_l = &func_info_j->access_footprint->data[l];
-
-					if (va_k->type != VarAccess_Null && va_l->type != VarAccess_Null) {
-						if (equal_var_accesses(va_k, va_l)) {
-							DynamicAOS *call_trace = init_aos();
-							printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
-							trace_va_overlap(func_info_i, va_k, call_trace);
-							reset_aos(&call_trace);
-							trace_va_overlap(func_info_j, va_l, call_trace);
-							printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
-							va_k->type = VarAccess_Null;
-							va_l->type = VarAccess_Null;
-							free_aos(call_trace);
-							continue;
-						}
-						
-					}
-				}
-			}
+			
+			find_va_overlap(func_info_i, func_info_j, client_data);
 		}
 	}
 
