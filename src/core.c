@@ -1171,22 +1171,27 @@ prong_error_t process_args(int argc, char **argv,
 }
 
 void print_usage(const char *prog_name) {
-    printf("Usage: %s --files=\"file1,file2,...\" --functions=\"foo(arg1, arg2);bar(arg1, arg2);...\" [OPT ARGS] [clang ARGS]\n", prog_name);
-    printf("\n");
-    printf("Required arguments:\n");
-    printf("  --files=LIST        Comma-separated list of input source files\n");
-    printf("  --functions=LIST    Semicolon-separated list of function calls\n");
-    printf("\n");
-    printf("Function call format:\n");
-    printf("  foo(arg1, arg2, shared_arg)\n\n");
-    printf("  bar(shared_arg, arg3, arg4)\n");
-    printf("\n");
-    printf("Optional arguments:\n");
-    printf("  --verbose           Enable verbose output\n");
-    printf("  --help              Show this help message and exit\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s --files=\"main.c,util.c\" --functions=\"init();run(arg)\"\n", prog_name);
-    printf("  %s --files=\"a.c,b.c,c.c\" --functions=\"foo(arg);bar(arg)\" --verbose\n", prog_name);
+	printf("\nUsage: %s --files=\"file1,file2,...\" --functions=\"foo(arg1, arg2);bar(arg1, arg2);...\" [OPT ARGS] [clang ARGS]\n", prog_name);
+	printf("\n");
+	printf("Required arguments:\n");
+	printf("  --files=LIST        Comma-separated list of input source files\n");
+	printf("  --functions=LIST    Semicolon-separated list of function calls\n");
+	printf("  --trace=LIST        Semicolon-separated list of tracable parameters or globals\n");
+	printf("\n");
+	printf("Function call format:\n");
+	printf("  foo(arg1, arg2, shared_arg)\n\n");
+	printf("  bar(shared_arg, arg3, arg4)\n");
+	printf("\n");
+	printf("Individual variable tracing format:\n");
+	printf("  foo@param1\n\n");
+	printf("  glob1\n");
+	printf("\n");
+	printf("Optional arguments:\n");
+	printf("  --verbose           Enable verbose output\n");
+	printf("  --help              Show this help message and exit\n");
+	printf("\n");
+	printf("Examples:\n");
+	printf("  %s --files=\"main.c,util.c\" --functions=\"init();run(arg)\"\n", prog_name);
+	printf("  %s --files=\"a.c,b.c,c.c\" --functions=\"foo(arg);bar(arg)\" --verbose\n\n", prog_name);
 }
 
