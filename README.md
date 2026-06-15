@@ -28,6 +28,12 @@ make
 prongc --files="file1.c,file2.c,..." \
        --functions="foo(arg1, arg2);bar(arg1, arg2);..." \
         [OPT ARGS] [CLANG ARGS]
+
+# Or trace individual variable
+prongc --files="file.c" \
+       --functions="foo(arg1)" \
+       --trace="foo@arg1" \
+       [OPT ARGS] [CLANG ARGS]
 ```
 Command line function name format:
 
@@ -42,6 +48,15 @@ Make sure that each non-shared arguments in both function calls has a unique nam
 going to be treated as a shared argument by prongc.
 
 Recommended: Give the arguments the same names of the parameters in the function definitions.
+
+Trace argument input format:
+
+```bash
+--trace="foo@param1;global1;..."
+```
+Where param1 is the parameter you want traced, and global1 is any global variable.
+
+Make sure to include --functions argument.
 
 ## Output example
 
