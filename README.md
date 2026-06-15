@@ -24,6 +24,9 @@ autoreconf -i
 ./configure
 make
 
+# Install
+sudo make install
+
 # Run
 prongc --files="file1.c,file2.c,..." \
        --functions="foo(arg1, arg2);bar(arg1, arg2);..." \
