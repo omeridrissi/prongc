@@ -9,6 +9,7 @@
  * likely valid for our use case here. */
 
 #include "dyn_aos.h"
+#include "log.h"
 
 /* Initiate DynamicAOS struct fields, data is initially
  * predetermined with AOS_INITIAL_SIZE macro */
@@ -21,6 +22,7 @@ DynamicAOS *init_aos(void)
 	array_struct->data = (char*)malloc(sizeof(char)*AOS_INITIAL_CAP);
 	array_struct->strings = (char**)malloc(sizeof(char*)*AOS_MAX_STR_COUNT);
 	array_struct->capacity = AOS_INITIAL_CAP;
+	array_struct->strings_cap = AOS_MAX_STR_COUNT;
 	array_struct->size = 0;
 	array_struct->count = 0;
 
@@ -68,21 +70,34 @@ prong_error_t aos_push_string(DynamicAOS *array, const char *str)
 {
 	size_t str_size = strlen(str)+1;
 
+	if ((array->count + 1) > array->strings_cap) {
+		size_t new_strings_cap = array->strings_cap ? array->strings_cap*2 : AOS_MAX_STR_COUNT;
+		array->strings = reallocarray(array->strings, new_strings_cap, sizeof(char*));
+		if (!array->strings) {
+			print_error("DynamicAOS: aos_push_string: out of memory\n");
+			return ERR_OUT_OF_MEMORY;
+		}
+
+		array->strings_cap = new_strings_cap;
+	}
+
 	/* Bounds check. Double array size if evaluates to true */
-bounds_check:
+bounds_check_data:
 	if ((array->size + str_size) > array->capacity) {
 		size_t new_cap = array->capacity ? array->capacity*2 : AOS_INITIAL_CAP;
 		char *old_data = array->data;
 		array->data = reallocarray(array->data, new_cap, sizeof(char));
 
-		if (!array->data)
+		if (!array->data) {
+			print_error("DynamicAOS: aos_push_string: out of memory\n");
 			return ERR_OUT_OF_MEMORY;
+		}
 
 		array->capacity = new_cap;
 		aos_update_old_strings(array, old_data); // array->strings[] now points to old freed buffer.
 					       // udpates all array->strings[] values to fit new one.
 
-		goto bounds_check;
+		goto bounds_check_data;
 	}
 
 	memcpy(array->data + array->size, str, str_size);
@@ -166,6 +181,21 @@ char *aos_string_at(DynamicAOS *array, size_t idx)
 		return NULL;
 	
 	return array->strings[idx];
+}
+
+/* Append all strings from array2 to array2 */
+prong_error_t aos_append_strings(DynamicAOS *array1, DynamicAOS *array2) 
+{
+	if (array1 == NULL || array2 == NULL ||
+	    array1->count == 0 || array2->count == 0) {
+		return ERR_INVALID_ARG;
+	}
+
+	for (size_t i = 0; i < array2->count; ++i) {
+		aos_push_string(array1, array2->strings[i]);
+	}
+
+	return ERR_OK;
 }
 
 /* Prints all the strings in the array */

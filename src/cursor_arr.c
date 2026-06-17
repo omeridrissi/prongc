@@ -298,6 +298,29 @@ void print_cursor_array(CXCursorArr *cursor_array)
 	}
 }
 
+bool prong_is_system_header(CXSourceLocation loc) {
+	bool is_system = clang_Location_isInSystemHeader(loc);
+	
+	if (!is_system) {
+		CXFile file;
+		unsigned line, column, offset;
+		clang_getSpellingLocation(loc, &file, &line, &column, &offset);
+		CXString filename = clang_getFileName(file);
+		const char* path = clang_getCString(filename);
+		
+		if (strstr(path, "/linux/") || 
+			strstr(path, "include/linux") ||
+			strstr(path, "arch/") ||
+			strstr(path, "kernel/") ||
+			strstr(path, "mm/") ||
+			strstr(path, "fs/")) {
+			is_system = true;
+		}
+		clang_disposeString(filename);
+	}
+	return is_system;
+}
+
 /* Allocates an array of CXTranslationUnit structs */
 CXTranslationUnit *alloc_tu_array(int length) 
 {

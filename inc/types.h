@@ -8,6 +8,7 @@ typedef struct {
 	size_t capacity;
 	size_t size;
 	size_t count;
+	size_t strings_cap; // strings[] capacity
 	char *data;	// Packed string data
 	char **strings; // Pointer to each string
 } DynamicAOS;
@@ -103,9 +104,11 @@ struct prong_priv {
 	DynamicAOS	*func_names;	// The func names we get from cmdline
 	DynamicAOS	*file_names;	// The file names we get from cmdline
 	DynamicAOS	*trace_var_names;// Function parameters or global variables 
-					// to trace exclusively
+					 // to trace exclusively
+	char		*compdb_dir;	// Path to compilation database directory
 	DynamicAOS	*trace_usrs;	// USRs of variables to trace exclusively
 	DynamicAOS	*clang_args;	// Arguments to be passed to libclang
+	DynamicAOS	*extra_args;	// These are appended to prong_priv->clang_args
 
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
 	

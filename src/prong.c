@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <clang-c/Index.h>
+#include <clang-c/CXCompilationDatabase.h>
 
 #include "types.h"
 #include "core.h"
@@ -37,23 +38,26 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
-	printf("%s[info]%s using clang arguments: ", CLR_VAR, CLR_RESET);
-	aos_print_strings(client_data->clang_args);
-	printf("\n");
-
-	printf("%s[info]%s parsing files: ", CLR_VAR, CLR_RESET);
-	aos_print_strings(client_data->file_names);
-	printf("\n");
-	
-	printf("%s[info]%s searching function CXCursors: ", CLR_VAR, CLR_RESET);
-	aos_print_strings(client_data->func_names);
-	printf("\n");
-
-	if (client_data->trace_var_names) {
-		printf("%s[info]%s tracing variables: ", CLR_VAR, CLR_RESET);
-		aos_print_strings(client_data->trace_var_names);
+	if (arg_verbose) {
+		printf("%s[info]%s using clang arguments: ", CLR_VAR, CLR_RESET);
+		aos_print_strings(client_data->extra_args);
 		printf("\n");
-
+	
+		printf("%s[info]%s parsing files: ", CLR_VAR, CLR_RESET);
+		aos_print_strings(client_data->file_names);
+		printf("\n");
+		
+		printf("%s[info]%s searching function CXCursors: ", CLR_VAR, CLR_RESET);
+		aos_print_strings(client_data->func_names);
+		printf("\n");
+	
+		if (client_data->trace_var_names) {
+			printf("%s[info]%s tracing variables: ", CLR_VAR, CLR_RESET);
+			aos_print_strings(client_data->trace_var_names);
+			printf("\n");
+	
+		}
+	
 	}
 
 	if (arg_help) {
@@ -70,20 +74,73 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
+	CXCompilationDatabase_Error error = CXCompilationDatabase_NoError;
+	CXCompilationDatabase db = NULL;
+	if (client_data->compdb_dir) {
+		printf("%s[info]%s compilation database directory: %s\n", CLR_VAR, CLR_RESET, client_data->compdb_dir);
+		
+		db = clang_CompilationDatabase_fromDirectory(
+			client_data->compdb_dir,
+			&error
+		);
+		
+		if (error == CXCompilationDatabase_CanNotLoadDatabase) {
+			print_error("Couldn't load compilation database at %s\n", client_data->compdb_dir);
+			print_error("Error code CXCompilationDatabase_CanNotLoadDatabase\n");
+			db = NULL;
+		}
+	}
+
 	size_t tu_count = client_data->file_names->count;
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
-		client_data->tu_array[i] = clang_parseTranslationUnit(
+		/* If compilation DB exists, use it's arguments for compilation */
+		if (db != NULL) {
+			reset_aos(&client_data->clang_args);
+			CXCompileCommands commands = clang_CompilationDatabase_getCompileCommands(
+				db,
+				client_data->file_names->strings[i]
+			);
+
+			unsigned int num_commands = clang_CompileCommands_getSize(commands);
+			for (unsigned int j = 0; j < num_commands; ++j) {
+				CXCompileCommand command = clang_CompileCommands_getCommand(commands, j);
+				unsigned int num_args = clang_CompileCommand_getNumArgs(command);
+				for (unsigned int k = 1; k < num_args-2; ++k) { /* start at 1 to skip 'clang' */
+					CXString arg_str = clang_CompileCommand_getArg(command, k);
+					if (strcmp(clang_getCString(arg_str), client_data->file_names->strings[i]) == 0 ||
+					    strcmp(clang_getCString(arg_str), "clang") == 0 ||
+					    strcmp(clang_getCString(arg_str), "-c") == 0)
+						continue;
+					aos_push_string(client_data->clang_args, clang_getCString(arg_str));
+					clang_disposeString(arg_str);
+				}
+			}
+			clang_CompileCommands_dispose(commands);
+		}
+		
+		// Append custom clang arguments from cmdline
+		aos_append_strings(client_data->clang_args, client_data->extra_args);
+
+		if (arg_verbose) {
+			printf("%s[info]%s using clang arguments for file %s:", CLR_VAR, CLR_RESET, client_data->file_names->strings[i]);
+			aos_print_strings(client_data->clang_args);
+			printf("\n");
+		}
+
+		printf("Parsing translation unit #%zu...\n", i);
+		enum CXErrorCode parse_err = clang_parseTranslationUnit2(
 			index,
 			aos_string_at(client_data->file_names, i), 
 			(const char * const*)client_data->clang_args->strings,
 			client_data->clang_args->count,
-			NULL, 0,
-			CXTranslationUnit_None
+			NULL, 0, CXTranslationUnit_None, 
+			&client_data->tu_array[i]
 		);
-		
-		if (!client_data->tu_array[i]) {
-			print_error("Unable to parse translation unit. Quitting.\n");
+
+		if (parse_err != 0) {
+			print_error("Unable to parse translation unit %zu. CXErrorCode = %d. Quitting\n", i, parse_err);
 			ret = ERR_TU; // it didn't find the file or whatever
+			tu_count = i;
 			goto free_tu_array;
 		}
 
@@ -126,7 +183,9 @@ int main(int argc, char **argv)
 			goto free_tu_array;
 		}
 	}
-	
+	if (db)
+		clang_CompilationDatabase_dispose(db);
+
 	process_tu_array(client_data->tu_array, client_data);
 
 	if (client_data->funcs->size != client_data->func_names->count) {
@@ -140,7 +199,7 @@ int main(int argc, char **argv)
 	}
 	
 	reset_aos(&client_data->touched_func_usrs);
-
+	
 	//// Done with this stage, probably won't need this anymore
 	//if (arg_verbose) {
 	//	print_verbose("showing raw state...\n");
@@ -162,7 +221,7 @@ int main(int argc, char **argv)
 
 		free_aos(parsed_func_call);
 	}
-	
+
 	/* Build array of variable accesses that contains ALL
 	 * variable accesses recursively */
 	for (size_t i = 0; i < client_data->funcs->size; ++i) {
@@ -204,5 +263,6 @@ free_priv:
 	prong_free_priv(client_data);
 
 exit:
+	printf("%sDone.%s\n", CLR_VAR, CLR_RESET);
 	return ret;
 }

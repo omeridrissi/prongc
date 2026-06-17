@@ -45,6 +45,8 @@ CXCursor	get_cursor_array_tail(CXCursorArr *cursor_array);
 
 size_t get_param_idx(CXCursor call_expr, CXCursorArr *stack);
 
+bool prong_is_system_header(CXSourceLocation loc);
+
 void		print_cursor(CXCursor cursor);
 void		print_cursor_array(CXCursorArr *cursor_array);
 

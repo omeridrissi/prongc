@@ -488,7 +488,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				clang_getCString(callee_usr),
 				clang_getCString(callee_name),
 				clang_getCString(callee_spelling),
-				clang_Location_isInSystemHeader(callee_location),
+				prong_is_system_header(callee_location),
 				clang_isCursorDefinition(working_cursor));
 		
 			clang_disposeString(callee_spelling);
@@ -707,12 +707,14 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 						   access_footprint);
 		}
 	}
-
-	for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
-		VarAccess *working_va = &func_info->var_accesses->data[i];
 	
-		if (working_va->type != VarAccess_Null) 
-			push_access_copy(access_footprint, working_va); 
+	if (func_info->var_accesses) {
+		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
+			VarAccess *working_va = &func_info->var_accesses->data[i];
+		
+			if (working_va->type != VarAccess_Null) 
+				push_access_copy(access_footprint, working_va); 
+		}
 	}
 }
 
@@ -924,6 +926,7 @@ struct prong_priv *prong_init_priv()
 	prong_priv->trace_var_names = init_aos();
 
 	prong_priv->clang_args = init_aos();
+	prong_priv->extra_args = init_aos();
 
 	prong_priv->global_usrs = init_aos();
 
@@ -951,6 +954,8 @@ void prong_free_priv(struct prong_priv *prong_priv)
 
 	if (prong_priv->clang_args)
 		free_aos(prong_priv->clang_args);
+	if (prong_priv->extra_args)
+		free_aos(prong_priv->extra_args);
 
 	if (prong_priv->global_usrs)
 		free_aos(prong_priv->global_usrs);
@@ -1119,10 +1124,10 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 				}
 			} else if (glob_ret == GLOB_NOSPACE) {
 				print_error("pattern match error: glob: out of memory\n");
-			} else if (glob_ret == GLOB_ABORTED) {
-				print_error("pattern match error: glob: aborted\n");
 			} else {
-				print_error("pattern match error: no matches found\n");
+				if (glob_ret == GLOB_ABORTED) {
+					print_error("pattern match error: glob: aborted\n");
+				} 
 			}
 
 			globfree(&pglob);
@@ -1136,6 +1141,7 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 #define FILES_ARG_STRLEN 8
 #define FUNCS_ARG_STRLEN 12
 #define TRACE_VARS_STRLEN 8
+#define COMP_DB_STRLEN 13
 
 /* Take the necessary information provided in command line
  * and save it in state (prong_priv/client_data struct) 
@@ -1154,12 +1160,14 @@ prong_error_t process_args(int argc, char **argv,
 			split_semicolon_list(cmd_arg+FUNCS_ARG_STRLEN, prong_priv->func_names);
 		} else if (strncmp(cmd_arg, "--trace=", TRACE_VARS_STRLEN) == 0) {
 			split_semicolon_list(cmd_arg+TRACE_VARS_STRLEN, prong_priv->trace_var_names);
+		} else if (strncmp(cmd_arg, "--compdb-dir=", COMP_DB_STRLEN) == 0) {
+			prong_priv->compdb_dir = cmd_arg+COMP_DB_STRLEN;
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {
 			arg_help = true;
 		} else {
-			aos_push_string(prong_priv->clang_args, cmd_arg);
+			aos_push_string(prong_priv->extra_args, cmd_arg);
 		}
 	}
 

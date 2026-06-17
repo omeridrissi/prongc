@@ -25,5 +25,6 @@ bool		aos_contains_string(DynamicAOS *array, const char *needle);
 ssize_t		aos_find_string_idx(DynamicAOS *array, const char *needle);
 char		*aos_find_string(DynamicAOS *array, const char *needle);
 char		*aos_string_at(DynamicAOS *array, size_t idx);
+prong_error_t	aos_append_strings(DynamicAOS *array1, DynamicAOS *array2);
 
 void		aos_print_strings(DynamicAOS *array);
