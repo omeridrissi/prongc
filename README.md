@@ -7,11 +7,6 @@ Given two or more function invocations with symbolic arguments, prongC traces ho
 are used through the program and identifies variables that are read or modified in multiple
 source code locations.
 
-Unlike many code-analysis tools, prongC does not require a build system, compilation database,
-or whole-program analysis. It works directly from source files and function invocations, 
-making it useful for exploring large codebases, auditing side effects, analyzing call ordering,
-and investigating hidden data dependencies.
-
 ## Dependencies
 
 prongC only depends on llvm-21, which you can install here: https://apt.llvm.org/
@@ -60,6 +55,16 @@ Trace argument input format:
 Where param1 is the parameter you want traced, and global1 is any global variable.
 
 Make sure to include --functions argument.
+
+## Use with compile database
+
+```bash
+prongc --files="..." --functions="..." --compdb-dir="[directory with compile_commands.json]"
+```
+
+## Linux kernel
+
+For use on the Linux kernel, check out the [dedicated guide](docs/KERNEL_USAGE.md).
 
 ## Output example
 
