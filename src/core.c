@@ -488,7 +488,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				clang_getCString(callee_usr),
 				clang_getCString(callee_name),
 				clang_getCString(callee_spelling),
-				prong_is_system_header(callee_location),
+				prong_is_system_header(callee_location, prong_priv->file_names),
 				clang_isCursorDefinition(working_cursor));
 		
 			clang_disposeString(callee_spelling);
@@ -795,7 +795,7 @@ void trace_va_overlap(FuncInfo *func_info,
 			VarAccess *working_va = &func_info->var_accesses->data[i];
 			if (equal_var_access_structs(var_access, working_va)) {
 				print_call_trace(func_info, var_access, call_trace);
-				break;
+				goto end_recursion;
 			}
 		}
 	}
@@ -828,7 +828,7 @@ void find_va_overlap(FuncInfo *func_info_i,
 					trace_va_overlap(func_info_i, va_k, call_trace);
 					reset_aos(&call_trace);
 					trace_va_overlap(func_info_j, va_l, call_trace);
-					printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
+					printf("%s-------------------%s\n\n", CLR_VAR, CLR_RESET);
 					va_k->type = VarAccess_Null;
 					va_l->type = VarAccess_Null;
 					free_aos(call_trace);
@@ -871,7 +871,7 @@ void find_exclusive_va_names(FuncInfo *func_info, struct prong_priv *client_data
 						DynamicAOS *call_trace = init_aos();
 						printf("%sTracing %s:%s\n", CLR_VAR, postfix, CLR_RESET);
 						trace_va_overlap(func_info, va_k, call_trace);
-						printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
+						printf("%s-------------------%s\n\n", CLR_VAR, CLR_RESET);
 						va_k->type = VarAccess_Null;
 						free_aos(call_trace);
 					}
@@ -882,7 +882,7 @@ void find_exclusive_va_names(FuncInfo *func_info, struct prong_priv *client_data
 					DynamicAOS *call_trace = init_aos();
 					printf("%sTracing %s:%s\n", CLR_VAR, postfix, CLR_RESET);
 					trace_va_overlap(func_info, va_k, call_trace);
-					printf("%s-------------------%s\n", CLR_VAR, CLR_RESET);
+					printf("%s-------------------%s\n\n", CLR_VAR, CLR_RESET);
 					va_k->type = VarAccess_Null;
 					free_aos(call_trace);
 				}

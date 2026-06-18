@@ -298,9 +298,9 @@ void print_cursor_array(CXCursorArr *cursor_array)
 	}
 }
 
-bool prong_is_system_header(CXSourceLocation loc) {
+bool prong_is_system_header(CXSourceLocation loc, DynamicAOS *file_names) {
 	bool is_system = clang_Location_isInSystemHeader(loc);
-	
+
 	if (!is_system) {
 		CXFile file;
 		unsigned line, column, offset;
@@ -308,6 +308,11 @@ bool prong_is_system_header(CXSourceLocation loc) {
 		CXString filename = clang_getFileName(file);
 		const char* path = clang_getCString(filename);
 		
+		for (size_t i = 0; i < file_names->count; ++i) {
+			if (strcmp(file_names->strings[i], path) == 0)
+				return false;
+		}
+
 		if (strstr(path, "/linux/") || 
 			strstr(path, "include/linux") ||
 			strstr(path, "arch/") ||

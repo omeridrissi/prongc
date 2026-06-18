@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 					   working_func_info->access_footprint);
 	}
 
-	if (client_data->trace_var_names) {
+	if (client_data->trace_var_names->count != 0) {
 		for (size_t f = 0; f < client_data->funcs->size; ++f) {
 			FuncInfo *func_info = &client_data->funcs->data[f];
 			find_exclusive_va_names(func_info, client_data);
