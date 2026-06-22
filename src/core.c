@@ -1198,6 +1198,7 @@ void print_usage(const char *prog_name) {
 	printf("  glob1\n");
 	printf("\n");
 	printf("Optional arguments:\n");
+	printf("  -j[max_threads]     Specify maximum number of concurrent threads for parsing stage\n");
 	printf("  --verbose           Enable verbose output\n");
 	printf("  --help              Show this help message and exit\n");
 	printf("\n");
