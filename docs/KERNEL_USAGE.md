@@ -22,3 +22,8 @@ make M=path/to/driver compile_commands.json CC=clang -j$(nproc)
 prongc ... --compdb-dir="[directory with compile_commands.json]"
 ```
 
+If you run into errors created by '-Wunused-command-line-arguments', consider running prongC with
+
+```bash
+prongc ... -Wno-unused-command-line-argument
+```
