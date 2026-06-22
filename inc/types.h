@@ -1,7 +1,18 @@
 #include <stdbool.h>
 #include <clang-c/Index.h>
+#include <clang-c/CXCompilationDatabase.h>
+#include <pthread.h>
 
 #pragma once
+
+typedef struct {
+	pthread_t	*threads;
+	size_t		num_threads;
+	size_t		next_file_idx; // Next file to parse
+	pthread_mutex_t mutex;
+	pthread_mutex_t err;		// For printing errors
+	size_t		num_active;
+} ThreadInfo;
 
 /* Dynamic string array utility layer struct */
 typedef struct {
@@ -101,6 +112,7 @@ typedef struct {
  * our program will collect and use over time */
 struct prong_priv {
 	CXTranslationUnit *tu_array;	// Translation unit array
+	CXCompilationDatabase db;	// compile_database.json
 	DynamicAOS	*func_names;	// The func names we get from cmdline
 	DynamicAOS	*file_names;	// The file names we get from cmdline
 	DynamicAOS	*trace_var_names;// Function parameters or global variables 
@@ -109,6 +121,9 @@ struct prong_priv {
 	DynamicAOS	*trace_usrs;	// USRs of variables to trace exclusively
 	DynamicAOS	*clang_args;	// Arguments to be passed to libclang
 	DynamicAOS	*extra_args;	// These are appended to prong_priv->clang_args
+
+	ThreadInfo	thread_info;	// Info about threads that will parse our files
+	size_t		max_threads;	// Maximum number of concurrent threads
 
 	DynamicAOS	*global_usrs;	// Bag of collected USRs of all global variables
 	

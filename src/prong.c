@@ -10,6 +10,7 @@
 #include "cursor_arr.h"
 #include "var_access.h"
 #include "log.h"
+#include "prong_thread_pool.h"
 
 bool arg_verbose = false;
 bool arg_help = false;
@@ -75,11 +76,10 @@ int main(int argc, char **argv)
 	}
 
 	CXCompilationDatabase_Error error = CXCompilationDatabase_NoError;
-	CXCompilationDatabase db = NULL;
 	if (client_data->compdb_dir) {
 		printf("%s[info]%s compilation database directory: %s\n", CLR_VAR, CLR_RESET, client_data->compdb_dir);
 		
-		db = clang_CompilationDatabase_fromDirectory(
+		client_data->db = clang_CompilationDatabase_fromDirectory(
 			client_data->compdb_dir,
 			&error
 		);
@@ -87,63 +87,30 @@ int main(int argc, char **argv)
 		if (error == CXCompilationDatabase_CanNotLoadDatabase) {
 			print_error("Couldn't load compilation database at %s\n", client_data->compdb_dir);
 			print_error("Error code CXCompilationDatabase_CanNotLoadDatabase\n");
-			db = NULL;
+			client_data->db = NULL;
 		}
 	}
 
+	/* Initiate ThreadInfo and deploy parsing threads */
+	client_data->thread_info = init_thread_pool(client_data->max_threads);
+	ThreadInfo *thread_info = &client_data->thread_info;
+
+	for (size_t i = 0; i < client_data->max_threads; ++i) {
+		pthread_create(&thread_info->threads[i], NULL,
+				parse_file_thread, (void*)client_data);
+	}
+
+	for (size_t i = 0; i < thread_info->num_threads; ++i) {
+		pthread_join(thread_info->threads[i], NULL);
+	}
+
+	destroy_thread_pool(thread_info);
+	
+	if (client_data->db)
+		clang_CompilationDatabase_dispose(client_data->db);
+
 	size_t tu_count = client_data->file_names->count;
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
-		/* If compilation DB exists, use it's arguments for compilation */
-		if (db != NULL) {
-			reset_aos(&client_data->clang_args);
-			CXCompileCommands commands = clang_CompilationDatabase_getCompileCommands(
-				db,
-				client_data->file_names->strings[i]
-			);
-
-			unsigned int num_commands = clang_CompileCommands_getSize(commands);
-			for (unsigned int j = 0; j < num_commands; ++j) {
-				CXCompileCommand command = clang_CompileCommands_getCommand(commands, j);
-				unsigned int num_args = clang_CompileCommand_getNumArgs(command);
-				for (unsigned int k = 1; k < num_args-2; ++k) { /* start at 1 to skip 'clang' */
-					CXString arg_str = clang_CompileCommand_getArg(command, k);
-					if (strcmp(clang_getCString(arg_str), client_data->file_names->strings[i]) == 0 ||
-					    strcmp(clang_getCString(arg_str), "clang") == 0 ||
-					    strcmp(clang_getCString(arg_str), "-c") == 0)
-						continue;
-					aos_push_string(client_data->clang_args, clang_getCString(arg_str));
-					clang_disposeString(arg_str);
-				}
-			}
-			clang_CompileCommands_dispose(commands);
-		}
-		
-		// Append custom clang arguments from cmdline
-		aos_append_strings(client_data->clang_args, client_data->extra_args);
-
-		if (arg_verbose) {
-			printf("%s[info]%s using clang arguments for file %s:", CLR_VAR, CLR_RESET, client_data->file_names->strings[i]);
-			aos_print_strings(client_data->clang_args);
-			printf("\n");
-		}
-
-		printf("Parsing translation unit #%zu...\n", i);
-		enum CXErrorCode parse_err = clang_parseTranslationUnit2(
-			index,
-			aos_string_at(client_data->file_names, i), 
-			(const char * const*)client_data->clang_args->strings,
-			client_data->clang_args->count,
-			NULL, 0, CXTranslationUnit_None, 
-			&client_data->tu_array[i]
-		);
-
-		if (parse_err != 0) {
-			print_error("Unable to parse translation unit %zu. CXErrorCode = %d. Quitting\n", i, parse_err);
-			ret = ERR_TU; // it didn't find the file or whatever
-			tu_count = i;
-			goto free_tu_array;
-		}
-
 		size_t num_diagnostics = clang_getNumDiagnostics(client_data->tu_array[i]);
 		bool has_error = false;
 		
@@ -177,14 +144,13 @@ int main(int argc, char **argv)
 		}
 
 		if (has_error) {
-			print_error("Errors detected parsing translation unit %zu\n", i);
+			print_error("Errors detected parsing translation unit \"%s\"\n",
+					client_data->file_names->strings[i]);
 			ret = ERR_SYNTAX;
 			tu_count = i;
 			goto free_tu_array;
 		}
 	}
-	if (db)
-		clang_CompilationDatabase_dispose(db);
 
 	process_tu_array(client_data->tu_array, client_data);
 

@@ -1142,6 +1142,7 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 #define FUNCS_ARG_STRLEN 12
 #define TRACE_VARS_STRLEN 8
 #define COMP_DB_STRLEN 13
+#define JOB_COUNT_STRLEN 2
 
 /* Take the necessary information provided in command line
  * and save it in state (prong_priv/client_data struct) 
@@ -1162,6 +1163,8 @@ prong_error_t process_args(int argc, char **argv,
 			split_semicolon_list(cmd_arg+TRACE_VARS_STRLEN, prong_priv->trace_var_names);
 		} else if (strncmp(cmd_arg, "--compdb-dir=", COMP_DB_STRLEN) == 0) {
 			prong_priv->compdb_dir = cmd_arg+COMP_DB_STRLEN;
+		} else if (strncmp(cmd_arg, "-j", JOB_COUNT_STRLEN) == 0) {
+			prong_priv->max_threads = atoi(cmd_arg+JOB_COUNT_STRLEN);
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {
