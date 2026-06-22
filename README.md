@@ -32,6 +32,9 @@ prongc --files="file.c" \
        --functions="foo(arg1)" \
        --trace="foo@arg1" \
        [OPT ARGS] [CLANG ARGS]
+
+# Recommended: use multithreading to parse files quicker
+prong -j[max_threads] ...
 ```
 Command line function name format:
 
