@@ -38,7 +38,7 @@ AS_VERSION_COMPARE([$llvm_version], [21.0.0],
 LIBCLANG_CPPFLAGS=`$LLVM_CONFIG --cflags`
 LIBCLANG_LIBDIR=`$LLVM_CONFIG --libdir`
 LIBCLANG_LDFLAGS=`$LLVM_CONFIG --ldflags`
-LIBCLANG_LIBS="-L$LIBCLANG_LIBDIR -lclang"
+LIBCLANG_LIBS="-lclang `$LLVM_CONFIG --libs --system-libs`"
 
 # Checks for libclang headers.
 save_CPPFLAGS="$CPPFLAGS"
