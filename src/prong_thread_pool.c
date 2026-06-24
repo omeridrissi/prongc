@@ -45,7 +45,8 @@ void *parse_file_thread(void *arg)
 		pthread_mutex_unlock(&thread_info->mutex);
 	
 		DynamicAOS *clang_args = init_aos();
-		printf("Parsing file '%s'\n", prong_priv->file_names->strings[tu_idx]);
+		if (arg_verbose)
+		printf("Parsing file %s'%s'%s\n", CLR_VAR, prong_priv->file_names->strings[tu_idx], CLR_RESET);
 	
 		if (prong_priv->db != NULL) {
 			CXCompileCommands commands = clang_CompilationDatabase_getCompileCommands(
@@ -91,13 +92,14 @@ void *parse_file_thread(void *arg)
 			free_aos(clang_args);
 			goto exit_thread;
 		}
-
+	
+		if (arg_verbose)
+			printf("Thread done parsing %s'%s'%s\n", CLR_VAR, prong_priv->file_names->strings[tu_idx], CLR_RESET);
 
 		free_aos(clang_args);
 	}
 	
 exit_thread:
-	print_debug("parsing thread: cleanup: exitting\n");
 
 	pthread_exit(0);
 }
