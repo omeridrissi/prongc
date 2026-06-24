@@ -60,7 +60,7 @@ LDFLAGS="$save_LDFLAGS"
 LIBS="$save_LIBS"
 
 # Compiler warnings (simple version without custom macros)
-PRONGC_CFLAGS="-D_ISOC11_SOURCE -Wall -Wextra"
+PRONGC_CFLAGS="-D_ISOC11_SOURCE -Wall -Wextra -O3"
 
 # Check for optional warning flags and add if supported
 for flag in \
