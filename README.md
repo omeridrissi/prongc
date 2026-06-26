@@ -1,4 +1,5 @@
-# ![Logo](./pics/logo.svg) prongC
+<img src="./pics/logo.svg" alt="Logo" width="150"/>
+# prongC
 
 prongC is a static analysis tool for C that detects shared variable accesses between 
 function calls.
