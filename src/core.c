@@ -907,6 +907,8 @@ bool is_usr_param_postfix(const char *usr, const char *param_name) {
 	return true;
 }
 
+#define DEFAULT_MAX_THREADS 2
+
 /* Initializes the state we're going to be
  * working with. Zeroes it out, but then allocates
  * and sets the dynamic string arrays corresponding
@@ -934,6 +936,8 @@ struct prong_priv *prong_init_priv()
 
 	prong_priv->funcs = init_func_info_array();
 	prong_priv->touched_func_usrs = init_aos();
+
+	prong_priv->max_threads = DEFAULT_MAX_THREADS;
 
 	return prong_priv;
 
