@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 		ret = ERR_OUT_OF_MEMORY;
 		goto free_priv;
 	}
-
+	
 	CXCompilationDatabase_Error error = CXCompilationDatabase_NoError;
 	if (client_data->compdb_dir) {
 		printf("%s[info]%s compilation database directory: %s\n", CLR_VAR, CLR_RESET, client_data->compdb_dir);
@@ -110,6 +110,7 @@ int main(int argc, char **argv)
 		clang_CompilationDatabase_dispose(client_data->db);
 
 	size_t tu_count = client_data->file_names->count;
+
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
 		size_t num_diagnostics = clang_getNumDiagnostics(client_data->tu_array[i]);
 		bool has_error = false;

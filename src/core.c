@@ -230,6 +230,55 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				break;
 		}
 
+		char decl_name_str[256];
+		char decl_usr_str[384];
+
+		memset(decl_name_str, '\0', sizeof(decl_name_str));
+		memset(decl_usr_str, '\0', sizeof(decl_usr_str));
+
+		strcpy(decl_name_str, clang_getCString(decl_name));
+		strcpy(decl_usr_str, clang_getCString(decl_usr));
+
+		size_t closest_membexpr_offset = get_cursor_offset_of_kind(prong_priv->ancestry_stack,
+									   CXCursor_MemberRefExpr);
+		/* loop through MemberRefExpr cursors to construct nested field reference name and usr */
+		/* (my_struct->nested.val) */
+		if (closest_membexpr_offset != ANCESTOR_NOT_FOUND) {
+			size_t stack_size = prong_priv->ancestry_stack->size;
+			CXCursor previous_memberref = referenced_cursor;
+			for (size_t i = closest_membexpr_offset; i < stack_size; i++) {
+				CXCursor member_cursor = prong_priv->ancestry_stack->data[stack_size-i];
+
+				if (clang_getCursorKind(member_cursor) == CXCursor_MemberRefExpr) {
+					// Concat '.' or '->'
+					CXType prev_memberref_type = clang_getCursorType(previous_memberref);
+					if (prev_memberref_type.kind == CXType_Pointer) {
+						strcat(decl_name_str, "->");
+						strcat(decl_usr_str, "::");
+					} else {
+						strcat(decl_name_str, ".");
+						strcat(decl_usr_str, "::");
+					}
+					
+					CXCursor member_referenced = clang_getCursorReferenced(member_cursor);
+					// concat referenced spelling
+					CXString member_spelling = clang_getCursorSpelling(member_referenced);
+					//CXString member_usr = clang_getCursorUSR(member_referenced);
+	
+					strcat(decl_name_str, clang_getCString(member_spelling));
+					strcat(decl_usr_str, clang_getCString(member_spelling));
+
+					//clang_disposeString(member_usr);
+					clang_disposeString(member_spelling);
+
+					previous_memberref = member_referenced;
+				
+				}
+			}
+			print_debug("Our name: %s\n", decl_name_str);
+			print_debug("Our USR: %s\n", decl_usr_str);
+		}
+
 		if (closest_callexpr_offset < closest_binop_offset &&
 		    closest_callexpr_offset < closest_arrsubexp_offset) {
 			CXCursor callexpr_decl = clang_getCursorReferenced(closest_callexpr_ancestor);
@@ -243,8 +292,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					size_t param_idx = get_param_idx(closest_callexpr_ancestor,
 									 prong_priv->ancestry_stack);
 					push_var_access(current_func->var_accesses,
-							clang_getCString(decl_usr),
-							clang_getCString(decl_name),
+							decl_usr_str,
+							decl_name_str,
 							clang_getCString(callexpr_usr),
 							current_func->spelling,
 							param_idx,
@@ -255,8 +304,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					size_t param_idx = get_param_idx(closest_callexpr_ancestor,
 									 prong_priv->ancestry_stack);
 					push_var_access(current_func->var_accesses,
-							clang_getCString(decl_usr),
-							clang_getCString(decl_name),
+							decl_usr_str,
+							decl_name_str,
 							clang_getCString(callexpr_usr),
 							current_func->spelling,
 							param_idx, current_line, current_column, 
@@ -267,8 +316,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				size_t param_idx = get_param_idx(closest_callexpr_ancestor,
 								 prong_priv->ancestry_stack);
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						clang_getCString(callexpr_usr),
 						current_func->spelling, param_idx, 
 						current_line, current_column, 
@@ -279,8 +328,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				size_t param_idx = get_param_idx(closest_callexpr_ancestor,
 								 prong_priv->ancestry_stack);
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						clang_getCString(callexpr_usr),
 						current_func->spelling,
 						param_idx, current_line, current_column, 
@@ -304,16 +353,16 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					    in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
 						// Push as write
 						push_var_access(current_func->var_accesses,
-								clang_getCString(decl_usr),
-								clang_getCString(decl_name),
+								decl_usr_str,
+								decl_name_str,
 								NULL, current_func->spelling, NO_IDX, 
 								current_line, current_column, 
 								VarAccess_PtrWrite, is_ptr_type);
 					} else {
 						// Push as read
 						push_var_access(current_func->var_accesses,
-								clang_getCString(decl_usr),
-								clang_getCString(decl_name),
+								decl_usr_str,
+								decl_name_str,
 								NULL, current_func->spelling, NO_IDX,
 								current_line, current_column, 
 								VarAccess_PtrRead, is_ptr_type);
@@ -322,8 +371,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			} else {
 				// Push as read
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						NULL, current_func->spelling, NO_IDX,
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
@@ -349,15 +398,15 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						    in_cursor_stack(prong_priv->ancestry_stack, 
 									non_assign_binop_lhs)) {
 							push_var_access(current_func->var_accesses,
-									clang_getCString(decl_usr),
-									clang_getCString(decl_name),
+									decl_usr_str,
+									decl_name_str,
 									NULL, current_func->spelling, NO_IDX,
 									current_line, current_column, 
 									VarAccess_PtrWrite, is_ptr_type);	
 						} else {
 							push_var_access(current_func->var_accesses,
-									clang_getCString(decl_usr),
-									clang_getCString(decl_name),
+									decl_usr_str,
+									decl_name_str,
 									NULL, current_func->spelling, NO_IDX,
 									current_line, current_column, 
 									VarAccess_Read, is_ptr_type);
@@ -365,16 +414,16 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					} else {
 						// Push as read if not
 						push_var_access(current_func->var_accesses,
-								clang_getCString(decl_usr),
-								clang_getCString(decl_name),
+								decl_usr_str,
+								decl_name_str,
 								NULL, current_func->spelling, NO_IDX,
 								current_line, current_column, 
 								VarAccess_PtrRead, is_ptr_type);
 					}
 				} else {
 					push_var_access(current_func->var_accesses,
-							clang_getCString(decl_usr),
-							clang_getCString(decl_name),
+							decl_usr_str,
+							decl_name_str,
 							NULL, current_func->spelling, NO_IDX,
 							current_line, current_column, 
 							VarAccess_PtrRead, is_ptr_type);
@@ -385,16 +434,16 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				   unop_kind == CXUnaryOperator_PostDec) {
 				// Definitely push as write
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Write, is_ptr_type);
 			} else {
 				// Push as read
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
@@ -410,16 +459,16 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			    in_cursor_stack(prong_priv->ancestry_stack, binop_lhs)) {
 				// Push as write
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Write, is_ptr_type);
 			} else {
 				// Push as read if not
 				push_var_access(current_func->var_accesses,
-						clang_getCString(decl_usr),
-						clang_getCString(decl_name),
+						decl_usr_str,
+						decl_name_str,
 						NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
@@ -427,8 +476,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			
 		} else	{
 			push_var_access(current_func->var_accesses,
-					clang_getCString(decl_usr),
-					clang_getCString(decl_name),
+					decl_usr_str,
+					decl_name_str,
 					NULL, current_func->spelling, NO_IDX, 
 					current_line, current_column, 
 					VarAccess_Read, is_ptr_type);
@@ -585,7 +634,7 @@ static void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_acc
 // This function was made with by deepseek
 /* Generate an artificial USR that's distinct from the usual
  * USR format but unique enough to compare to libclang USRs */
-static char *generate_artificial_param_usr(const char *name)
+static char *generate_artificial_param_usr(const char *name, const char *old_usr)
 {
 	const char *safe_name = name ? name : "";
 
@@ -596,14 +645,21 @@ static char *generate_artificial_param_usr(const char *name)
 		hash = ((hash << 5) + hash) + (unsigned char)safe_name[i];
 	}
 
-	// Format: p:<hash>:<namelen>:<name>
+	char *field_access = strstr(old_usr, "::");
+		
+	// Format: p:<hash>:<namelen>:<name>::<field>
 	size_t buffer_size = 64 + name_len;
 	char *usr = (char*)malloc(buffer_size);
 	if (!usr) return NULL;
 
 	if (name_len > 0) {
-		snprintf(usr, buffer_size, "p:%u:%zu:%s",
-				hash, name_len, safe_name);
+		if (field_access != NULL)
+			snprintf(usr, buffer_size, "p:%u:%zu:%s%s",
+				 hash, name_len, safe_name, field_access);
+		else
+			snprintf(usr, buffer_size, "p:%u:%zu:%s",
+				 hash, name_len, safe_name);
+
 	} else {
 		snprintf(usr, buffer_size, "p:null:unnamed");
 	}
@@ -634,11 +690,12 @@ void unwind_func_info(FuncInfo *func_info,
 			if (var_accesses && param_usr) {
 				for (size_t j = 0; j < var_accesses->size; ++j) {
 					VarAccess *var_access = &var_accesses->data[j];
+					size_t param_usr_len = strlen(param_usr);
 
-					if (strcmp(var_access->usr, param_usr) == 0) {
+					if (strncmp(var_access->usr, param_usr, param_usr_len) == 0) {
 						const char *parsed_arg = aos_string_at(parsed_func_call, i);
 						free(var_access->usr);
-						var_access->usr = generate_artificial_param_usr(parsed_arg);
+						var_access->usr = generate_artificial_param_usr(parsed_arg, param_usr);
 					}
 				}
 

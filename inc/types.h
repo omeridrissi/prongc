@@ -6,6 +6,11 @@
 #pragma once
 
 typedef struct {
+	const char *lock_func;
+	const char *unlock_func;
+} LockPrimitivePair;
+
+typedef struct {
 	pthread_t	*threads;
 	size_t		num_threads;
 	size_t		next_file_idx; // Next file to parse

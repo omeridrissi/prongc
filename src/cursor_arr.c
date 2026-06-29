@@ -159,12 +159,30 @@ CXCursor get_binop_assignment(CXCursorArr *stack)
 	return clang_getNullCursor();
 }
 
+CXCursor get_farthest_memb_expr(CXCursorArr *stack) 
+{
+	for (size_t i = 0; i < stack->size; ++i) {
+		if (clang_getCursorKind(stack->data[i]) == CXCursor_MemberRefExpr)
+			return stack->data[i];
+	}
+}
+
+size_t get_farthest_memb_offset(CXCursorArr *stack) 
+{
+	for (size_t i = 0; i < stack->size; ++i) {
+		if (clang_getCursorKind(stack->data[i]) == CXCursor_MemberRefExpr)
+			return i;
+	}
+
+	return ANCESTOR_NOT_FOUND;
+}
+
 /* Traverses the array in reverse, and returns
  * base offest since. A cursor's base offset inside
  * the ancestry stack is it's index from the 
  * end of the array in reverse.
  * This function returns the closest base offset of
- * cursor of target kind on success, returns -1 on 
+ * cursor of target kind on success, returns ANCESTOR_NOT_FOUND on 
  * failure. */
 size_t get_cursor_offset_of_kind(CXCursorArr *stack, 
 				 enum CXCursorKind target_kind)
