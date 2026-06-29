@@ -275,8 +275,6 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				
 				}
 			}
-			print_debug("Our name: %s\n", decl_name_str);
-			print_debug("Our USR: %s\n", decl_usr_str);
 		}
 
 		if (closest_callexpr_offset < closest_binop_offset &&
