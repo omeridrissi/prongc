@@ -5,6 +5,7 @@
 #include "var_access.h"
 #include "cursor_arr.h"
 #include "log.h"
+#include "lock_tracking.h"
 
 /* Visitor function for matching our specified 
  * function in args to our desired function 
@@ -281,6 +282,8 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		    closest_callexpr_offset < closest_arrsubexp_offset) {
 			CXCursor callexpr_decl = clang_getCursorReferenced(closest_callexpr_ancestor);
 			CXString callexpr_usr = clang_getCursorUSR(callexpr_decl);
+			CXString callexpr_spelling = clang_getCursorSpelling(callexpr_decl);
+
 			if (closest_unop_offset < closest_callexpr_offset &&
 			    closest_unop_offset < closest_arrsubexp_offset) {
 				enum CXUnaryOperatorKind unop_kind = 
@@ -292,6 +295,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					push_var_access(current_func->var_accesses,
 							decl_usr_str,
 							decl_name_str,
+							clang_getCString(callexpr_spelling),
 							clang_getCString(callexpr_usr),
 							current_func->spelling,
 							param_idx,
@@ -304,6 +308,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					push_var_access(current_func->var_accesses,
 							decl_usr_str,
 							decl_name_str,
+							clang_getCString(callexpr_spelling),
 							clang_getCString(callexpr_usr),
 							current_func->spelling,
 							param_idx, current_line, current_column, 
@@ -316,6 +321,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
+						clang_getCString(callexpr_spelling),
 						clang_getCString(callexpr_usr),
 						current_func->spelling, param_idx, 
 						current_line, current_column, 
@@ -328,6 +334,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
+						clang_getCString(callexpr_spelling),
 						clang_getCString(callexpr_usr),
 						current_func->spelling,
 						param_idx, current_line, current_column, 
@@ -353,7 +360,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						push_var_access(current_func->var_accesses,
 								decl_usr_str,
 								decl_name_str,
-								NULL, current_func->spelling, NO_IDX, 
+								NULL, NULL, current_func->spelling, NO_IDX, 
 								current_line, current_column, 
 								VarAccess_PtrWrite, is_ptr_type);
 					} else {
@@ -361,7 +368,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						push_var_access(current_func->var_accesses,
 								decl_usr_str,
 								decl_name_str,
-								NULL, current_func->spelling, NO_IDX,
+								NULL, NULL, current_func->spelling, NO_IDX,
 								current_line, current_column, 
 								VarAccess_PtrRead, is_ptr_type);
 					}	
@@ -371,7 +378,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
-						NULL, current_func->spelling, NO_IDX,
+						NULL, NULL, current_func->spelling, NO_IDX,
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -398,14 +405,14 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 							push_var_access(current_func->var_accesses,
 									decl_usr_str,
 									decl_name_str,
-									NULL, current_func->spelling, NO_IDX,
+									NULL, NULL, current_func->spelling, NO_IDX,
 									current_line, current_column, 
 									VarAccess_PtrWrite, is_ptr_type);	
 						} else {
 							push_var_access(current_func->var_accesses,
 									decl_usr_str,
 									decl_name_str,
-									NULL, current_func->spelling, NO_IDX,
+									NULL, NULL, current_func->spelling, NO_IDX,
 									current_line, current_column, 
 									VarAccess_Read, is_ptr_type);
 						}
@@ -414,7 +421,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						push_var_access(current_func->var_accesses,
 								decl_usr_str,
 								decl_name_str,
-								NULL, current_func->spelling, NO_IDX,
+								NULL, NULL, current_func->spelling, NO_IDX,
 								current_line, current_column, 
 								VarAccess_PtrRead, is_ptr_type);
 					}
@@ -422,7 +429,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					push_var_access(current_func->var_accesses,
 							decl_usr_str,
 							decl_name_str,
-							NULL, current_func->spelling, NO_IDX,
+							NULL, NULL, current_func->spelling, NO_IDX,
 							current_line, current_column, 
 							VarAccess_PtrRead, is_ptr_type);
 				}
@@ -434,7 +441,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
-						NULL, current_func->spelling, NO_IDX, 
+						NULL, NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Write, is_ptr_type);
 			} else {
@@ -442,7 +449,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
-						NULL, current_func->spelling, NO_IDX, 
+						NULL, NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -459,7 +466,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
-						NULL, current_func->spelling, NO_IDX, 
+						NULL, NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Write, is_ptr_type);
 			} else {
@@ -467,7 +474,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
 						decl_name_str,
-						NULL, current_func->spelling, NO_IDX, 
+						NULL, NULL, current_func->spelling, NO_IDX, 
 						current_line, current_column, 
 						VarAccess_Read, is_ptr_type);
 			}
@@ -476,7 +483,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 			push_var_access(current_func->var_accesses,
 					decl_usr_str,
 					decl_name_str,
-					NULL, current_func->spelling, NO_IDX, 
+					NULL, NULL, current_func->spelling, NO_IDX, 
 					current_line, current_column, 
 					VarAccess_Read, is_ptr_type);
 
@@ -537,6 +544,18 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				clang_getCString(callee_spelling),
 				prong_is_system_header(callee_location, prong_priv->file_names),
 				clang_isCursorDefinition(working_cursor));
+	
+			if (!prong_priv->current_func->var_accesses)
+				prong_priv->current_func->var_accesses = 
+					init_var_access_array();
+
+			push_var_access(prong_priv->current_func->var_accesses,
+					NULL, NULL,
+					clang_getCString(callee_spelling),
+					clang_getCString(callee_usr),
+					prong_priv->current_func->spelling, NO_IDX,
+					0, 0, // Call variable accesses don't give reliable location info
+					VarAccess_Call, false);
 		
 			clang_disposeString(callee_spelling);
 			clang_disposeString(callee_usr);
@@ -692,8 +711,9 @@ void unwind_func_info(FuncInfo *func_info,
 
 					if (strncmp(var_access->usr, param_usr, param_usr_len) == 0) {
 						const char *parsed_arg = aos_string_at(parsed_func_call, i);
+						char *new_usr = generate_artificial_param_usr(parsed_arg, var_access->usr);
 						free(var_access->usr);
-						var_access->usr = generate_artificial_param_usr(parsed_arg, param_usr);
+						var_access->usr = new_usr;
 					}
 				}
 
@@ -701,17 +721,18 @@ void unwind_func_info(FuncInfo *func_info,
 
 		}
 	}
-	
+
 	// Resolve var to param aliases for this FuncInfo
-	if (func_info->callees) {
+	if (func_info->callees && var_accesses != NULL) {
 		for (size_t i = 0; i < var_accesses->size; ++i) {
 			VarAccess *var_access = &var_accesses->data[i];
-			if(var_access->type == VarAccess_Escape) {
-				// Go into callee parameters and replace
+			if(var_access->esc_func_usr) {
+				// Go into callee var_accesses and replace
 				// var access USR, names etc.
 				FuncInfo *esc_func_info = get_func_info_by_usr(func_info->callees,
 									       var_access->esc_func_usr);
-				if (esc_func_info && !esc_func_info->in_system_header)
+
+				if (esc_func_info && !esc_func_info->in_system_header) 
 					resolve_var_access_alias(esc_func_info, var_access);
 			}
 		}
@@ -721,6 +742,14 @@ void unwind_func_info(FuncInfo *func_info,
 	if (var_accesses != NULL) {
 		for (size_t i = 0; i < var_accesses->size; ++i) {
 			VarAccess *var_access = &var_accesses->data[i];
+
+			if (var_access->esc_func_spelling != NULL) {
+				VarAccessType va_lock_type = lock_primitive_type(var_access->esc_func_spelling);
+				if (va_lock_type != VarAccess_Null) {
+					var_access->type = va_lock_type;
+					continue;
+				}
+			}
 
 			if (/* var access usr is in locals but never escapes */
 			    !var_access->is_ptr_type &&
@@ -756,19 +785,31 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	if (func_info->in_system_header || !func_info->has_definition)
 		return;
 
-	if (func_info->callees) {
-		for (size_t i = 0; i < func_info->callees->size; ++i) {
-			build_var_access_footprint(&func_info->callees->data[i],
-						   access_footprint);
-		}
-	}
-	
+	//if (func_info->callees) {
+	//	for (size_t i = 0; i < func_info->callees->size; ++i) {
+	//		build_var_access_footprint(&func_info->callees->data[i],
+	//					   access_footprint);
+	//	}
+	//}
+
+	size_t next_callee = 0; // idx for callees
 	if (func_info->var_accesses) {
 		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 			VarAccess *working_va = &func_info->var_accesses->data[i];
-		
-			if (working_va->type != VarAccess_Null) 
+	
+			if (working_va->esc_func_usr &&
+			    func_info->callees != NULL) {
+				FuncInfo *working_func_info = &func_info->callees->data[next_callee];
+				build_var_access_footprint(working_func_info, access_footprint);
+				next_callee++;
+
+				continue;
+			}
+
+			if (working_va->type != VarAccess_Null &&
+			    working_va->type != VarAccess_Call) {
 				push_access_copy(access_footprint, working_va); 
+			}
 		}
 	}
 }
@@ -985,6 +1026,8 @@ struct prong_priv *prong_init_priv()
 	prong_priv->clang_args = init_aos();
 	prong_priv->extra_args = init_aos();
 
+	prong_priv->lock_pairs = init_aos();
+
 	prong_priv->global_usrs = init_aos();
 
 	prong_priv->ancestry_stack = init_cursor_array();
@@ -1015,6 +1058,9 @@ void prong_free_priv(struct prong_priv *prong_priv)
 		free_aos(prong_priv->clang_args);
 	if (prong_priv->extra_args)
 		free_aos(prong_priv->extra_args);
+
+	if (prong_priv->lock_pairs)
+		free_aos(prong_priv->lock_pairs);
 
 	if (prong_priv->global_usrs)
 		free_aos(prong_priv->global_usrs);
@@ -1202,6 +1248,7 @@ static void split_comma_list(char *str_in, DynamicAOS *dyn_aos)
 #define TRACE_VARS_STRLEN 8
 #define COMP_DB_STRLEN 13
 #define JOB_COUNT_STRLEN 2
+#define LOCK_PAIR_STRLEN 13
 
 /* Take the necessary information provided in command line
  * and save it in state (prong_priv/client_data struct) 
@@ -1222,8 +1269,12 @@ prong_error_t process_args(int argc, char **argv,
 			split_semicolon_list(cmd_arg+TRACE_VARS_STRLEN, prong_priv->trace_var_names);
 		} else if (strncmp(cmd_arg, "--compdb-dir=", COMP_DB_STRLEN) == 0) {
 			prong_priv->compdb_dir = cmd_arg+COMP_DB_STRLEN;
+		} else if (strncmp(cmd_arg, "--lock-pairs=", LOCK_PAIR_STRLEN) == 0) {
+			split_semicolon_list(cmd_arg+LOCK_PAIR_STRLEN, prong_priv->lock_pairs);
 		} else if (strncmp(cmd_arg, "-j", JOB_COUNT_STRLEN) == 0) {
 			prong_priv->max_threads = atoi(cmd_arg+JOB_COUNT_STRLEN);
+		} else if (strcmp(cmd_arg, "--silence-warnings") == 0) {
+			arg_silence_warnings = true;
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {
 			arg_verbose = true;
 		} else if (strcmp(cmd_arg, "--help") == 0) {

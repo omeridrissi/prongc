@@ -11,9 +11,11 @@
 #include "var_access.h"
 #include "log.h"
 #include "prong_thread_pool.h"
+#include "lock_tracking.h"
 
 bool arg_verbose = false;
 bool arg_help = false;
+bool arg_silence_warnings = false;
 
 int main(int argc, char **argv) 
 {
@@ -37,6 +39,16 @@ int main(int argc, char **argv)
 	if (ret) {
 		print_usage(argv[0]);
 		goto free_priv;
+	}
+
+	LockPairArray lock_pair_array;
+	if (client_data->lock_pairs->count != 0) {
+		init_lock_pair_array(&lock_pair_array, client_data->lock_pairs->count);
+		ret = aos_to_lock_pair_array(client_data->lock_pairs, &lock_pair_array);
+		if (ret) {
+			print_error("Bad lock pair syntax");
+			goto free_lock_pair_array;
+		}
 	}
 
 	if (arg_verbose) {
@@ -114,6 +126,7 @@ int main(int argc, char **argv)
 	for (size_t i = 0; i < client_data->file_names->count; ++i) {
 		size_t num_diagnostics = clang_getNumDiagnostics(client_data->tu_array[i]);
 		bool has_error = false;
+		bool has_warning = false;
 		
 		if (num_diagnostics == 0)
 			continue;
@@ -134,14 +147,22 @@ int main(int argc, char **argv)
 					clang_disposeString(formatted);
 					break;
 				case CXDiagnostic_Warning:
-					formatted = clang_formatDiagnostic(diag, 
-							clang_defaultDiagnosticDisplayOptions());
-					print_warn("Warning: \n\t%s\n", clang_getCString(formatted));
-					clang_disposeString(formatted);
+					has_warning = true;
+					if (!arg_silence_warnings) {
+						formatted = clang_formatDiagnostic(diag, 
+								clang_defaultDiagnosticDisplayOptions());
+						print_warn("Warning: \n\t%s\n", clang_getCString(formatted));
+						clang_disposeString(formatted);
+					}
 					break;
 				default:
 			}
 			clang_disposeDiagnostic(diag);
+		}
+
+		if (has_warning && arg_silence_warnings) {
+			print_warn("Suppressed compiler warnings for translation unit \"%s\"\n",
+					client_data->file_names->strings[i]);
 		}
 
 		if (has_error) {
@@ -229,6 +250,9 @@ free_tu_array:
 free_priv:
 	prong_free_priv(client_data);
 
+free_lock_pair_array:
+	if (lock_pair_array.data != NULL)
+		free_lock_pair_array(&lock_pair_array);
 exit:
 	printf("%sDone.%s\n", CLR_VAR, CLR_RESET);
 	return ret;

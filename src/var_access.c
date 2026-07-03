@@ -5,6 +5,7 @@
 #define NO_IDX SIZE_MAX
 
 VarAccess *init_var_access(const char *usr, const char *name,
+			   const char *esc_func_spelling,
 			   const char *esc_func_usr, char *parent_func_name,
 			   size_t esc_param_idx,
 			   int line, int column, VarAccessType type,
@@ -31,6 +32,16 @@ VarAccess *init_var_access(const char *usr, const char *name,
 		var_access->esc_func_usr = strdup(esc_func_usr);
 	else
 		var_access->esc_func_usr = NULL;
+
+	if (esc_func_spelling != NULL)
+		var_access->esc_func_spelling = strdup(esc_func_spelling);
+	else
+		var_access->esc_func_spelling = NULL;
+
+	if (type == VarAccess_Call) {
+		var_access->usr = var_access->esc_func_usr;
+		var_access->name = var_access->esc_func_spelling;
+	}
 
 	var_access->is_ptr_type = is_ptr_type;
 
@@ -66,13 +77,14 @@ void free_var_access_array(VarAccessArr *var_access_array)
 }
 
 void push_var_access(VarAccessArr *var_access_array,
-			const char *usr, const char *name, 
+			const char *usr, const char *name,
+			const char *esc_func_spelling,
 			const char *esc_func_usr, char *parent_func_name,
 			size_t esc_param_idx, 
 			int line, int column, VarAccessType type,
 			bool is_ptr_type)
 {
-	VarAccess *var_access = init_var_access(usr, name, 
+	VarAccess *var_access = init_var_access(usr, name, esc_func_spelling,
 						esc_func_usr, parent_func_name,
 						esc_param_idx, line,
 						column, type, is_ptr_type);
@@ -144,12 +156,24 @@ void print_var_access(VarAccess *var_access, int indentation)
 		case VarAccess_Escape:
 			printf("passed to function as parameter\n");
 			break;
+		case VarAccess_LockAcquire:
+			printf("acquire lock\n");
+			break;
+		case VarAccess_LockRelease:
+			printf("release lock\n");
+			break;
+		case VarAccess_Call:
+			printf("function call\n");
+			break;
 		case VarAccess_Null:
 			printf("NULL\n");
 			break;
+		default:
+			printf("\n");
+			break;
 	}
-	if (var_access->esc_func_usr) 
-		printf("%*s|   esc func usr: %s\n", x, "", var_access->esc_func_usr);
+	if (var_access->esc_func_spelling) 
+		printf("%*s|   esc func usr: %s\n", x, "", var_access->esc_func_spelling);
 	
 	if (var_access->esc_param_idx != NO_IDX)
 		printf("%*s|   esc param idx: %zu\n", x, "", var_access->esc_param_idx);

@@ -1,14 +1,20 @@
+
+#pragma once
+
 #include <stdbool.h>
 #include <clang-c/Index.h>
 #include <clang-c/CXCompilationDatabase.h>
 #include <pthread.h>
 
-#pragma once
-
 typedef struct {
 	const char *lock_func;
 	const char *unlock_func;
 } LockPrimitivePair;
+
+typedef struct {
+	LockPrimitivePair	*data;
+	size_t			size;
+} LockPairArray;
 
 typedef struct {
 	pthread_t	*threads;
@@ -50,6 +56,11 @@ typedef enum {
 				// to function that we may or may not be able to 
 				// recurse through,
 				// and variable is a pointer or struct.
+	VarAccess_LockAcquire,	// passed to locking function like mutex_lock
+	VarAccess_LockRelease,	// passed to unlock function like mutex_unlock
+	VarAccess_Call,		// doesn't represent variable modification, instead
+				// serves as filler to mark function calls that might
+				// not accept any arguments
 	VarAccess_Null,		// This is for when we don't need the struct
 				// anymore so we null it out
 } VarAccessType;
@@ -60,6 +71,7 @@ typedef struct {
 	char		*usr;
 	char		*name;
 	char		*parent_func_name; // Reference to function name, not freeable
+	char		*esc_func_spelling;
 	char		*esc_func_usr; // Only if passed to function
 	size_t		esc_param_idx; // Paremeter idx when passed to func
 	int		line;
@@ -126,6 +138,8 @@ struct prong_priv {
 	DynamicAOS	*trace_usrs;	// USRs of variables to trace exclusively
 	DynamicAOS	*clang_args;	// Arguments to be passed to libclang
 	DynamicAOS	*extra_args;	// These are appended to prong_priv->clang_args
+	
+	DynamicAOS	*lock_pairs;	// Additional lock/unlock funcs specified in cmd-line
 
 	ThreadInfo	thread_info;	// Info about threads that will parse our files
 	size_t		max_threads;	// Maximum number of concurrent threads

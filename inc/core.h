@@ -10,10 +10,14 @@
 #include <clang-c/Index.h>
 #include "types.h"
 
+extern LockPrimitivePair default_lock_pairs;
+extern size_t num_default_pairs;
+
 #define DEFAULT_NUM_CURSORS 5
 
 extern bool arg_verbose;
 extern bool arg_help;
+extern bool arg_silence_warnings;
 
 void process_tu_array(CXTranslationUnit *tu_array, 
 		      struct prong_priv *client_data);

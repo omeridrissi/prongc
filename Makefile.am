@@ -8,7 +8,8 @@ prongc_SOURCES = \
 	src/dyn_aos.c \
 	src/log.c \
 	src/var_access.c \
-	src/prong_thread_pool.c
+	src/prong_thread_pool.c \
+	src/lock_tracking.c
 
 prongc_CFLAGS = $(PRONGC_CFLAGS) $(LIBCLANG_CPPFLAGS) -I$(srcdir)/inc
 prongc_LDFLAGS = $(LIBCLANG_LDFLAGS)

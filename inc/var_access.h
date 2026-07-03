@@ -8,6 +8,7 @@
 #define VAR_ACC_ARR_INIT_CAP 8
 
 VarAccess	*init_var_access(const char *usr, const char *name,
+				 const char *esc_func_spelling,
 				 const char *esc_func_usr, char *parent_func_name,
 				 size_t esc_func_idx,
 				 int line, int column, VarAccessType type, bool is_ptr_type);
@@ -17,6 +18,7 @@ VarAccessArr	*init_var_access_array();
 void		free_var_access_array(VarAccessArr *var_access_array);
 
 void		push_var_access(VarAccessArr *var_access_array,
+				const char *esc_func_spelling,
 				const char *usr, const char *name, 
 				const char *esc_func_usr, char *parent_func_name,
 				size_t esc_func_idx,

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 #include "dyn_aos.h"
 #include "log.h"
