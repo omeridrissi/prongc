@@ -37,6 +37,9 @@ prongc --files="file.c" \
 
 # Recommended: use multithreading to parse files quicker
 prong -j[max_threads] ...
+
+# Silence warnings
+prong --silence-warnings ...
 ```
 Command line function name format:
 

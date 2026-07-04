@@ -1310,6 +1310,7 @@ void print_usage(const char *prog_name) {
 	printf("Optional arguments:\n");
 	printf("  -j[max_threads]     Specify maximum number of concurrent threads for parsing stage\n");
 	printf("  --verbose           Enable verbose output\n");
+	printf("  --silence-warnings  Don't show compiler warnings. However, the user is notified when they are present.\n");
 	printf("  --help              Show this help message and exit\n");
 	printf("\n");
 	printf("Examples:\n");
