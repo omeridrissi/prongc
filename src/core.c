@@ -603,13 +603,11 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		}
 
 ifstmt_recurse:
-		prev_ifstmt_depth = ifstmt_cursor_depth;
 		ifstmt_cursor_depth++;
 		
 		// recurse after updating ifstmt recursion depth
 		clang_visitChildren(current_cursor, prong_visitor_walk_func, client_data);
 
-		prev_ifstmt_depth = ifstmt_cursor_depth;
 		ifstmt_cursor_depth--;
 		
 		if (!clang_Cursor_isNull(ifstmt_info.else_block) &&
