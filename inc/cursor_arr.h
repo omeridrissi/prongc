@@ -18,6 +18,12 @@ typedef struct {
 	bool found;
 } ClosestAncestorResult;
 
+typedef struct {
+	CXCursor condition_block;
+	CXCursor then_block;
+	CXCursor else_block;
+} IfStmtInfo;
+
 CXCursorArr	*init_cursor_array();
 void		free_cursor_array(CXCursorArr *var_access_array);
 
@@ -45,6 +51,10 @@ CXCursor find_callexpr_definition(CXCursor callexpr_cursor,
 				  struct prong_priv *client_data);
 
 CXCursor	get_cursor_array_tail(CXCursorArr *cursor_array);
+
+size_t get_num_children(CXCursor cursor);
+
+IfStmtInfo	get_ifstmt_info(CXCursor ifstmt_cursor);
 
 size_t get_param_idx(CXCursor call_expr, CXCursorArr *stack);
 

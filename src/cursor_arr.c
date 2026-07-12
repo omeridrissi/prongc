@@ -272,6 +272,56 @@ CXCursor find_callexpr_definition(CXCursor callexpr_cursor,
 	return pair.callexpr_def;
 }
 
+static enum CXChildVisitResult get_num_children_visitor(CXCursor cursor,
+							CXCursor parent,
+							CXClientData data)
+{
+	size_t *num_children = (size_t*)data;
+
+	*num_children++;
+	return CXChildVisit_Continue;
+}
+
+size_t get_num_children(CXCursor cursor) 
+{
+	size_t num_children = 0;
+	clang_visitChildren(cursor, get_num_children_visitor, &num_children);
+	return num_children;
+}
+
+size_t ifstmt_child_idx = 0;
+static enum CXChildVisitResult get_ifstmt_info(CXCursor cursor,
+					       CXCursor parent,
+					       CXClientData data)
+{
+	IfStmtInfo *if_info = (IfStmtInfo*)data;
+
+	if (ifstmt_child_idx == 0) {
+		if_info->condition_block = cursor;
+	} else if (ifstmt_child_idx == 1) {
+		if_info->then_block = cursor;
+	} else {
+		if_info->else_block = cursor;
+	}
+
+	ifstmt_child_idx++;
+	return CXChildVisit_Continue;
+}
+
+IfStmtInfo get_ifstmt_info(CXCursor ifstmt_cursor) 
+{
+	IfStmtInfo if_info = {0};
+
+	if_info.condition_block = clang_getNullCursor();
+	if_info.then_block = clang_getNullCursor();
+	if_info.else_block = clang_getNullCursor();
+
+	clang_visitChildren(cursor, get_ifstmt_info, &if_info);
+	ifstmt_child_idx = 0;
+
+	return if_info;
+}
+
 size_t get_param_idx(CXCursor call_expr, 
 		     CXCursorArr *stack) 
 {

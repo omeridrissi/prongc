@@ -6,6 +6,21 @@
 #include <clang-c/CXCompilationDatabase.h>
 #include <pthread.h>
 
+struct lock_protection_field {
+	unsigned int	lock_obj_hash; // based on lock object USR
+
+	unsigned int	lock_func_hash;	// Numbers representing lock/unlock func names
+	unsigned int	unlock_func_hash;
+
+//	VarAccess	*lock_va; // Pointer to LockAcquire VA
+};
+
+typedef struct {
+	struct lock_protection_field *lp_fields;
+	size_t		size;
+	size_t		capacity;
+} ProtectionFieldArray;
+
 typedef struct {
 	const char *lock_func;
 	const char *unlock_func;
@@ -48,6 +63,7 @@ typedef enum {
 
 /* Variable access types */
 typedef enum {
+	/* Access types */
 	VarAccess_Read = 0,	// "x = var1"
 	VarAccess_Write,	// "var1 = y"
 	VarAccess_PtrRead,	// reading the value pointer points to
@@ -56,11 +72,17 @@ typedef enum {
 				// to function that we may or may not be able to 
 				// recurse through,
 				// and variable is a pointer or struct.
+	/* Placeholder types (not necessarily tied to any variable) */
 	VarAccess_LockAcquire,	// passed to locking function like mutex_lock
 	VarAccess_LockRelease,	// passed to unlock function like mutex_unlock
 	VarAccess_Call,		// doesn't represent variable modification, instead
 				// serves as filler to mark function calls that might
 				// not accept any arguments
+	VarAccess_IfStmt,	// if statement
+	VarAccess_ElseIfStmt,	// else if statement
+	VarAccess_ElseStmt,	// else statement
+	VarAccess_EndIf,	// end of if statement block
+
 	VarAccess_Null,		// This is for when we don't need the struct
 				// anymore so we null it out
 } VarAccessType;
@@ -74,6 +96,7 @@ typedef struct {
 	char		*esc_func_spelling;
 	char		*esc_func_usr; // Only if passed to function
 	size_t		esc_param_idx; // Paremeter idx when passed to func
+	struct lock_protection_field *lp_field; // Info about lock protection being held
 	int		line;
 	int		column;
 	VarAccessType	type;

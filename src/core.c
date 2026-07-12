@@ -117,6 +117,8 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	return CXChildVisit_Recurse;
 }
 
+int ifstmt_cursor_depth = 0;
+int prev_ifstmt_depth = 0;
 /* Visitor function for looping through 
  * the children of the compound statement cursor 
  * relating to the function we've filtered 
@@ -576,6 +578,54 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		goto visitor_recurse;	
 	}
 
+	if (arg_track_locking && // This is for now the only case where we need this
+	    current_cursor_kind == CXCursor_IfStmt) {
+		if (!prong_priv->current_func->var_accesses)
+			prong_priv->current_func->var_accesses = 
+				init_var_access_array();
+
+		IfStmtInfo ifstmt_info = get_ifstmt_info(current_cursor);
+
+		if (ifstmt_cursor_depth == 0) {
+			push_var_access(prong_priv->current_func->var_accesses,
+					NULL, NULL,
+					NULL, NULL,
+					prong_priv->current_func->spelling, NO_IDX,
+					0, 0, // Call variable accesses don't give reliable location info
+					VarAccess_IfStmt, false);
+		} else {
+			push_var_access(prong_priv->current_func->var_accesses,
+					NULL, NULL,
+					NULL, NULL,
+					prong_priv->current_func->spelling, NO_IDX,
+					0, 0,
+					VarAccess_ElseIfStmt, false);
+		}
+
+ifstmt_recurse:
+		prev_ifstmt_depth = ifstmt_cursor_depth;
+		ifstmt_cursor_depth++;
+		
+		// recurse after updating ifstmt recursion depth
+		clang_visitChildren(current_cursor, prong_visitor_walk_func, client_data);
+
+		prev_ifstmt_depth = ifstmt_cursor_depth;
+		ifstmt_cursor_depth--;
+		
+		if (!clang_Cursor_isNull(ifstmt_info.else_block) &&
+		    clang_getCursorKind(ifstmt_info.else_block) != CXCursor_IfStmt) {
+			push_var_access(prong_priv->current_func->var_accesses,
+					NULL, NULL,
+					NULL, NULL,
+					prong_priv->current_func->spelling, NO_IDX,
+					0, 0,
+					VarAccess_Else, false);
+		}
+
+
+		return CXChildVisit_Continue;
+	}
+
 visitor_recurse:
 	return CXChildVisit_Recurse;
 }
@@ -908,25 +958,25 @@ end_recursion:
 	aos_pop_string(call_trace);
 }
 
-void find_va_overlap(FuncInfo *func_info_i, 
-		     FuncInfo *func_info_j,
+void find_va_overlap(FuncInfo *func_info_a, 
+		     FuncInfo *func_info_b,
 		     struct prong_priv *prong_priv)
 {
-	for (size_t k = 0; k < func_info_i->access_footprint->size; ++k) {
-		for (size_t l = 0; l < func_info_j->access_footprint->size; ++l) {
-			VarAccess *va_k = &func_info_i->access_footprint->data[k];
-			VarAccess *va_l = &func_info_j->access_footprint->data[l];
+	for (size_t i = 0; i < func_info_a->access_footprint->size; ++i) {
+		for (size_t j = 0; j < func_info_b->access_footprint->size; ++j) {
+			VarAccess *va_i = &func_info_a->access_footprint->data[i];
+			VarAccess *va_j = &func_info_b->access_footprint->data[j];
 
-			if (va_k->type != VarAccess_Null && va_l->type != VarAccess_Null) {
-				if (equal_var_accesses(va_k, va_l)) {
+			if (va_i->type != VarAccess_Null && va_j->type != VarAccess_Null) {
+				if (equal_var_accesses(va_i, va_j)) {
 					DynamicAOS *call_trace = init_aos();
 					printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
-					trace_va_overlap(func_info_i, va_k, call_trace);
+					trace_va_overlap(func_info_a, va_i, call_trace);
 					reset_aos(&call_trace);
-					trace_va_overlap(func_info_j, va_l, call_trace);
+					trace_va_overlap(func_info_b, va_j, call_trace);
 					printf("%s-------------------%s\n\n", CLR_VAR, CLR_RESET);
-					va_k->type = VarAccess_Null;
-					va_l->type = VarAccess_Null;
+					va_i->type = VarAccess_Null;
+					va_j->type = VarAccess_Null;
 					free_aos(call_trace);
 					goto loop_end;
 				}
@@ -935,7 +985,88 @@ void find_va_overlap(FuncInfo *func_info_i,
 loop_end:
 		}
 	}
+}
 
+ProtectionFieldArray lp_field_array_a; // for tracking va_i locking
+ProtectionFieldArray lp_field_array_b; // for tracking va_j locking
+void find_unprotected_va(FuncInfo *func_info_a, 
+		     FuncInfo *func_info_b,
+		     struct prong_priv *prong_priv)
+{
+	init_protection_field_array(&lp_field_array_a);
+	init_protection_field_array(&lp_field_array_b);
+
+	for (size_t i = 0; i < func_info_a->access_footprint->size; ++i) {
+		for (size_t j = 0; j < func_info_b->access_footprint->size; ++j) {
+			VarAccess *va_i = &func_info_a->access_footprint->data[i];
+			VarAccess *va_j = &func_info_b->access_footprint->data[j];
+
+			/* Add lock protection when LockAcquire, remove when LockRelease */
+			if (va_i->type == VarAccess_LockAcquire) {
+				LockPrimitivePair lock_prim_pair = get_pair_by_lock_func(&lock_pair_array,
+											 va_i->esc_func_spelling);
+
+				if (lock_pair_is_null(lock_prim_pair))
+					print_warn("lock primitve pair not found\n");
+
+				add_lock_protection_field(&lp_field_array_a, 
+							  lock_prim_pair,
+							  va_i->usr);
+			} else if (va_i->type == VarAccess_LockRelease) {
+				remove_lock_protection_field(&lp_field_array_a,
+							     va_i->usr, va_i->name);
+			}
+
+			if (va_j->type == VarAccess_LockAcquire) {
+				LockPrimitivePair lock_prim_pair = get_pair_by_lock_func(&lock_pair_array,
+											 va_i->esc_func_spelling);
+
+				if (lock_pair_is_null(lock_prim_pair))
+					print_warn("lock primitve pair not found\n");
+
+				add_lock_protection_field(&lp_field_array_b,
+							  lock_prim_pair,
+							  va_j->usr, va_j->name);
+			} else if (va_j->type == VarAccess_LockRelease) {
+				remove_lock_protection_field(&lp_field_array_b,
+							     va_j->usr);
+			}
+
+			if (va_i->type != VarAccess_Null && 
+			    va_j->type != VarAccess_Null &&
+			    equal_var_accesses(va_i, va_j)) {
+				size_t num_matched = 0;
+				for (size_t k = 0; k < lp_field_array_a->size; ++k) {
+					struct lock_protection_field *lp_field_k = &lp_field_array_a.lp_fields[k];
+					if (lp_field_is_null(lp_field_k))
+						continue;
+					for (size_t l = 0; l < lp_field_array_b->size; ++l) {
+						struct lock_protection_field *lp_field_l = &lp_field_array_b.lp_fields[l];
+						if (lp_field_is_null(lp_field_l))
+							continue;
+
+						
+					}
+				}
+				DynamicAOS *call_trace = init_aos();
+				printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
+				trace_va_overlap(func_info_a, va_i, call_trace);
+				reset_aos(&call_trace);
+				trace_va_overlap(func_info_b, va_j, call_trace);
+				printf("%s-------------------%s\n\n", CLR_VAR, CLR_RESET);
+				va_i->type = VarAccess_Null;
+				va_j->type = VarAccess_Null;
+				free_aos(call_trace);
+				goto loop_end;
+			}
+
+loop_end:
+		}
+	}
+
+free_lock_protection_fields:
+	destroy_protection_field_array(&lp_field_array_a);
+	destroy_protection_field_array(&lp_field_array_b);
 }
 
 char *mark_postfix_func_name(char *postfix, char **arg_name) {
@@ -988,6 +1119,7 @@ void find_exclusive_va_names(FuncInfo *func_info, struct prong_priv *client_data
 	}
 	
 }
+
 bool is_usr_param_postfix(const char *usr, const char *param_name) {
 	size_t usr_len = strlen(usr);
 	size_t param_len = strlen(param_name);
@@ -1271,8 +1403,11 @@ prong_error_t process_args(int argc, char **argv,
 			prong_priv->compdb_dir = cmd_arg+COMP_DB_STRLEN;
 		} else if (strncmp(cmd_arg, "--lock-pairs=", LOCK_PAIR_STRLEN) == 0) {
 			split_semicolon_list(cmd_arg+LOCK_PAIR_STRLEN, prong_priv->lock_pairs);
+			arg_track_locking = true;
 		} else if (strncmp(cmd_arg, "-j", JOB_COUNT_STRLEN) == 0) {
 			prong_priv->max_threads = atoi(cmd_arg+JOB_COUNT_STRLEN);
+		} else if (strcmp(cmd_arg, "--track-locking") == 0) {
+			arg_track_locking = true;
 		} else if (strcmp(cmd_arg, "--silence-warnings") == 0) {
 			arg_silence_warnings = true;
 		} else if (strcmp(cmd_arg, "--verbose") == 0) {

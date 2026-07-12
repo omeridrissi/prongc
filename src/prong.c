@@ -17,6 +17,9 @@ bool arg_verbose = false;
 bool arg_help = false;
 bool arg_silence_warnings = false;
 
+bool arg_track_locking = false;
+LockPairArray lock_pair_array;
+
 int main(int argc, char **argv) 
 {
 	struct prong_priv *client_data;
@@ -41,14 +44,29 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
-	LockPairArray lock_pair_array;
+	init_lock_pair_array(&lock_pair_array, 
+			     num_default_pairs+client_data->lock_pairs->count);
+	
 	if (client_data->lock_pairs->count != 0) {
-		init_lock_pair_array(&lock_pair_array, client_data->lock_pairs->count);
 		ret = aos_to_lock_pair_array(client_data->lock_pairs, &lock_pair_array);
 		if (ret) {
-			print_error("Bad lock pair syntax");
+			print_error("Bad lock pair syntax: %d\n", ret);
 			goto free_lock_pair_array;
 		}
+	}
+
+	/* Add default lock primitive pairs */
+	for (size_t i = client_data->lock_pairs->count; i < lock_pair_array.size; ++i) {
+		LockPrimitivePair default_pair = default_lock_pairs[i-client_data->lock_pairs->count];
+		LockPrimitivePair *working_pair = &lock_pair_array.data[i];
+
+		working_pair->lock_func = default_pair.lock_func;
+		working_pair->unlock_func = default_pair.unlock_func;
+	}
+
+	printf("%s[info]%s adding specified lock pairs:\n", CLR_VAR, CLR_RESET);
+	for (size_t i = 0; i < lock_pair_array.size; ++i) {
+		PRINT_LOCK_PAIR(&lock_pair_array.data[i]);
 	}
 
 	if (arg_verbose) {
