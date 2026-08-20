@@ -64,12 +64,12 @@ int main(int argc, char **argv)
 		working_pair->unlock_func = default_pair.unlock_func;
 	}
 
-	printf("%s[info]%s adding specified lock pairs:\n", CLR_VAR, CLR_RESET);
-	for (size_t i = 0; i < lock_pair_array.size; ++i) {
-		PRINT_LOCK_PAIR(&lock_pair_array.data[i]);
-	}
-
 	if (arg_verbose) {
+		printf("%s[info]%s adding specified lock pairs:\n", CLR_VAR, CLR_RESET);
+		for (size_t i = 0; i < lock_pair_array.size; ++i) {
+			PRINT_LOCK_PAIR(&lock_pair_array.data[i]);
+		}
+
 		printf("%s[info]%s using clang arguments: ", CLR_VAR, CLR_RESET);
 		aos_print_strings(client_data->extra_args);
 		printf("\n");
@@ -96,8 +96,6 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 
-	CXIndex index = clang_createIndex(0, 0);
-
 	client_data->tu_array = alloc_tu_array(client_data->file_names->count);
 
 	if (!client_data->tu_array) {
@@ -105,6 +103,7 @@ int main(int argc, char **argv)
 		goto free_priv;
 	}
 	
+
 	CXCompilationDatabase_Error error = CXCompilationDatabase_NoError;
 	if (client_data->compdb_dir) {
 		printf("%s[info]%s compilation database directory: %s\n", CLR_VAR, CLR_RESET, client_data->compdb_dir);
@@ -135,13 +134,14 @@ int main(int argc, char **argv)
 	}
 
 	destroy_thread_pool(thread_info);
-	
+
+
 	if (client_data->db)
 		clang_CompilationDatabase_dispose(client_data->db);
 
 	size_t tu_count = client_data->file_names->count;
 
-	for (size_t i = 0; i < client_data->file_names->count; ++i) {
+	for (unsigned int i = 0; i < client_data->file_names->count; ++i) {
 		size_t num_diagnostics = clang_getNumDiagnostics(client_data->tu_array[i]);
 		bool has_error = false;
 		bool has_warning = false;
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 		if (num_diagnostics == 0)
 			continue;
 
-		for (size_t j = 0; j < num_diagnostics; ++j) {
+		for (unsigned int j = 0; j < num_diagnostics; ++j) {
 			CXDiagnostic diag = clang_getDiagnostic(client_data->tu_array[i], j);
 			enum CXDiagnosticSeverity diag_severity = 
 					clang_getDiagnosticSeverity(diag);
@@ -245,20 +245,33 @@ int main(int argc, char **argv)
 		}
 		goto free_tu_array;
 	}
-	// Messiest part :(
-	/* Basically checks if two FuncInfos contain the same VarAccess by
-	 * using the collection of all variable accesses from both functions 
-	 * (access_footprint)*/
-	for (size_t i = 0; i < client_data->funcs->size; ++i) {
-		for (size_t j = 0; j < client_data->funcs->size; ++j) {
-			if (i == j)
-				continue;
 
-			FuncInfo *func_info_i = &client_data->funcs->data[i];
-			FuncInfo *func_info_j = &client_data->funcs->data[j];
-			
-			find_va_overlap(func_info_i, func_info_j, client_data);
+	/* Look for variable overlaps */
+	if (!arg_track_locking) {
+		for (size_t i = 0; i < client_data->funcs->size; ++i) {
+			for (size_t j = 0; j < client_data->funcs->size; ++j) {
+				if (i == j)
+					continue;
+
+				FuncInfo *func_info_i = &client_data->funcs->data[i];
+				FuncInfo *func_info_j = &client_data->funcs->data[j];
+								
+				find_va_overlap(func_info_i, func_info_j);
+			}
 		}
+	} else {
+		for (size_t i = 0; i < client_data->funcs->size; ++i) {
+			for (size_t j = 0; j < client_data->funcs->size; ++j) {
+				if (i == j)
+					continue;
+
+				FuncInfo *func_info_i = &client_data->funcs->data[i];
+				FuncInfo *func_info_j = &client_data->funcs->data[j];
+								
+				find_unprotected_va(func_info_i, func_info_j);
+			}
+		}
+
 	}
 
 free_tu_array:

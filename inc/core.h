@@ -38,8 +38,9 @@ void trace_va_overlap(FuncInfo *func_info,
 		      DynamicAOS *call_trace);
 
 void find_va_overlap(FuncInfo *func_info_i, 
-		     FuncInfo *func_info_j,
-		     struct prong_priv *prong_priv);
+		     FuncInfo *func_info_j);
+void find_unprotected_va(FuncInfo *func_info_a, 
+		     FuncInfo *func_info_b);
 
 char *mark_postfix_func_name(char *postfix, char **arg_name);
 void find_exclusive_va_names(FuncInfo *func_info, struct prong_priv *client_data);

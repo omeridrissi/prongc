@@ -117,8 +117,16 @@ static enum CXChildVisitResult prong_visitor_walk_ast(CXCursor current_cursor,
 	return CXChildVisit_Recurse;
 }
 
-int ifstmt_cursor_depth = 0;
-int prev_ifstmt_depth = 0;
+#define RESTORE_CURSOR_ARRAY(array) \
+while ((array)->size > 0) {				\
+	CXCursor tail = get_cursor_array_tail((array));	\
+	if (cursors_are_equal(tail, parent_cursor)) {	\
+		break;					\
+	}						\
+							\
+	pop_cursor((array));				\
+}							\
+
 /* Visitor function for looping through 
  * the children of the compound statement cursor 
  * relating to the function we've filtered 
@@ -133,7 +141,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 	enum CXLinkageKind current_cursor_linkage = clang_getCursorLinkage(current_cursor);
 
 	/* What we have to unfortunately do because 
-	 * libclang is a piece of shit (manually building ancestry stack)*/
+	 * libclang doesn't offer another solution (manually building ancestry stack)*/
 	if (clang_Cursor_isNull(prong_priv->last_visited)) {
 		push_cursor(prong_priv->ancestry_stack, &parent_cursor);
 	} else {
@@ -141,12 +149,23 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		    cursors_are_equal(parent_cursor, prong_priv->last_visited)) {
 			push_cursor(prong_priv->ancestry_stack, &parent_cursor);
 		} else {
+			// RESTORE_CURSOR_ARRAY(prong_priv->ancestry_stack);
+
 			while (prong_priv->ancestry_stack->size > 0) {
 				CXCursor tail = get_cursor_array_tail(prong_priv->ancestry_stack);
 				if (cursors_are_equal(tail, parent_cursor)) {
 					break;
 				}
-
+					
+				if (clang_getCursorKind(tail) == CXCursor_IfStmt &&
+				    arg_track_locking) {
+					push_var_access(prong_priv->current_func->var_accesses,
+							NULL, NULL,
+							NULL, NULL,
+							prong_priv->current_func->spelling, NO_IDX,
+							0, 0,
+							VarAccess_EndIf, false);
+				}
 				pop_cursor(prong_priv->ancestry_stack);
 			}
 		}
@@ -171,7 +190,46 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		clang_disposeString(current_cursor_usr);
 	}
 
+	if (arg_track_locking && // This is for now the only case where we need this
+	    clang_getCursorKind(parent_cursor) == CXCursor_IfStmt) {
+		if (!prong_priv->current_func->var_accesses)
+			prong_priv->current_func->var_accesses = 
+				init_var_access_array();
 
+		IfStmtInfo ifstmt_info = get_ifstmt_info(parent_cursor);
+
+		if (cursors_are_equal(current_cursor, ifstmt_info.then_block)) {
+			push_var_access(prong_priv->current_func->var_accesses,
+					NULL, NULL,
+					NULL, NULL,
+					prong_priv->current_func->spelling, NO_IDX,
+					0, 0,
+					VarAccess_ThenBlock, false);		
+		} else if (!clang_Cursor_isNull(ifstmt_info.else_block) &&
+			   cursors_are_equal(current_cursor, ifstmt_info.else_block)) {
+			push_var_access(prong_priv->current_func->var_accesses,
+					NULL, NULL,
+					NULL, NULL,
+					prong_priv->current_func->spelling, NO_IDX,
+					0, 0,
+					VarAccess_ElseStmt, false);		
+		} 
+	}
+
+	if (arg_track_locking &&
+	    current_cursor_kind == CXCursor_IfStmt) {
+		if (!prong_priv->current_func->var_accesses)
+			prong_priv->current_func->var_accesses = 
+				init_var_access_array();
+
+		push_var_access(prong_priv->current_func->var_accesses,
+				NULL, NULL,
+				NULL, NULL,
+				prong_priv->current_func->spelling, NO_IDX,
+				0, 0,
+				VarAccess_IfStmt, false);
+	}
+	
 	// If declrefexpr is the descendant of the last child of the array
 	// of pushed cursors, the 
 	if (current_cursor_kind == CXCursor_DeclRefExpr) {
@@ -292,7 +350,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					clang_getCursorUnaryOperatorKind(closest_unop_ancestor);
 				if (unop_kind == CXUnaryOperator_AddrOf) {
 					// Push as Escape
-					size_t param_idx = get_param_idx(closest_callexpr_ancestor,
+					unsigned int param_idx = get_param_idx(closest_callexpr_ancestor,
 									 prong_priv->ancestry_stack);
 					push_var_access(current_func->var_accesses,
 							decl_usr_str,
@@ -305,7 +363,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 							VarAccess_Escape, is_ptr_type);
 				} else {
 					// Push as Read
-					size_t param_idx = get_param_idx(closest_callexpr_ancestor,
+					unsigned int param_idx = get_param_idx(closest_callexpr_ancestor,
 									 prong_priv->ancestry_stack);
 					push_var_access(current_func->var_accesses,
 							decl_usr_str,
@@ -318,7 +376,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				}
 			} else if (is_ptr_type) {
 				// Push as Escape
-				size_t param_idx = get_param_idx(closest_callexpr_ancestor,
+				unsigned int param_idx = get_param_idx(closest_callexpr_ancestor,
 								 prong_priv->ancestry_stack);
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
@@ -331,7 +389,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 				
 			} else {
 				// Go to this thingy 
-				size_t param_idx = get_param_idx(closest_callexpr_ancestor,
+				unsigned int param_idx = get_param_idx(closest_callexpr_ancestor,
 								 prong_priv->ancestry_stack);
 				push_var_access(current_func->var_accesses,
 						decl_usr_str,
@@ -481,7 +539,7 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 						VarAccess_Read, is_ptr_type);
 			}
 			
-		} else	{
+		} else {
 			push_var_access(current_func->var_accesses,
 					decl_usr_str,
 					decl_name_str,
@@ -578,51 +636,15 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 		goto visitor_recurse;	
 	}
 
-	if (arg_track_locking && // This is for now the only case where we need this
-	    current_cursor_kind == CXCursor_IfStmt) {
-		if (!prong_priv->current_func->var_accesses)
-			prong_priv->current_func->var_accesses = 
-				init_var_access_array();
-
-		IfStmtInfo ifstmt_info = get_ifstmt_info(current_cursor);
-
-		if (ifstmt_cursor_depth == 0) {
-			push_var_access(prong_priv->current_func->var_accesses,
-					NULL, NULL,
-					NULL, NULL,
-					prong_priv->current_func->spelling, NO_IDX,
-					0, 0, // Call variable accesses don't give reliable location info
-					VarAccess_IfStmt, false);
-		} else {
-			push_var_access(prong_priv->current_func->var_accesses,
-					NULL, NULL,
-					NULL, NULL,
-					prong_priv->current_func->spelling, NO_IDX,
-					0, 0,
-					VarAccess_ElseIfStmt, false);
-		}
-
-ifstmt_recurse:
-		ifstmt_cursor_depth++;
-		
-		// recurse after updating ifstmt recursion depth
-		clang_visitChildren(current_cursor, prong_visitor_walk_func, client_data);
-
-		ifstmt_cursor_depth--;
-		
-		if (!clang_Cursor_isNull(ifstmt_info.else_block) &&
-		    clang_getCursorKind(ifstmt_info.else_block) != CXCursor_IfStmt) {
-			push_var_access(prong_priv->current_func->var_accesses,
-					NULL, NULL,
-					NULL, NULL,
-					prong_priv->current_func->spelling, NO_IDX,
-					0, 0,
-					VarAccess_Else, false);
-		}
-
-
-		return CXChildVisit_Continue;
-	}
+	//if (!cursors_are_equal(parent_cursor, prong_priv->last_visited) &&
+	//     clang_getCursorKind(prong_priv->last_visited) == CXCursor_IfStmt) {
+	//	push_var_access(prong_priv->current_func->var_accesses,
+	//			NULL, NULL,
+	//			NULL, NULL,
+	//			prong_priv->current_func->spelling, NO_IDX,
+	//			0, 0,
+	//			VarAccess_EndIf, false);
+	//}
 
 visitor_recurse:
 	return CXChildVisit_Recurse;
@@ -676,15 +698,16 @@ static void resolve_var_access_alias(FuncInfo *esc_func_info, VarAccess *var_acc
 	}
 
 	CXCursor param_cursor = clang_Cursor_getArgument(esc_func_info->cursor, 
-							 var_access->esc_param_idx);
+							 (unsigned int)var_access->esc_param_idx);
 	CXString param_usr = clang_getCursorUSR(param_cursor);
 	const char *param_usr_str = clang_getCString(param_usr);
 
 	if (esc_func_info->var_accesses) {
 		for (size_t i = 0; i < esc_func_info->var_accesses->size; ++i) {
 			VarAccess *working_va = &esc_func_info->var_accesses->data[i];
-				
-			if (strcmp(working_va->usr, param_usr_str) == 0) {
+			
+			if (!va_is_placeholder_type(working_va->type) && 
+			    strcmp(working_va->usr, param_usr_str) == 0) {
 				// Override this var access with escaped variable identity
 				// (just USR is sufficient for now)
 				free(working_va->usr);
@@ -752,16 +775,20 @@ void unwind_func_info(FuncInfo *func_info,
 	if (parsed_func_call != NULL) {
 		for (size_t i = 1; i < parsed_func_call->count; ++i) {
 			const char *param_usr = aos_string_at(func_info->params, i-1);
+			
 			if (var_accesses && param_usr) {
 				for (size_t j = 0; j < var_accesses->size; ++j) {
 					VarAccess *var_access = &var_accesses->data[j];
-					size_t param_usr_len = strlen(param_usr);
+					if (!va_is_placeholder_type(var_access->type) &&
+					    var_access->usr != NULL) {
+						size_t param_usr_len = strlen(param_usr);
 
-					if (strncmp(var_access->usr, param_usr, param_usr_len) == 0) {
-						const char *parsed_arg = aos_string_at(parsed_func_call, i);
-						char *new_usr = generate_artificial_param_usr(parsed_arg, var_access->usr);
-						free(var_access->usr);
-						var_access->usr = new_usr;
+						if (strncmp(var_access->usr, param_usr, param_usr_len) == 0) {
+							const char *parsed_arg = aos_string_at(parsed_func_call, i);
+							char *new_usr = generate_artificial_param_usr(parsed_arg, var_access->usr);
+							free(var_access->usr);
+							var_access->usr = new_usr;
+						}
 					}
 				}
 
@@ -771,30 +798,34 @@ void unwind_func_info(FuncInfo *func_info,
 	}
 
 	// Resolve var to param aliases for this FuncInfo
-	if (func_info->callees && var_accesses != NULL) {
+	if (func_info->callees != NULL && var_accesses != NULL) {
+		size_t next_callee = 0;
 		for (size_t i = 0; i < var_accesses->size; ++i) {
 			VarAccess *var_access = &var_accesses->data[i];
-			if(var_access->esc_func_usr) {
+			if(var_access->type == VarAccess_Call) {
 				// Go into callee var_accesses and replace
 				// var access USR, names etc.
-				FuncInfo *esc_func_info = get_func_info_by_usr(func_info->callees,
-									       var_access->esc_func_usr);
-
-				if (esc_func_info && !esc_func_info->in_system_header) 
+				FuncInfo *esc_func_info = &func_info->callees->data[next_callee];
+				
+				if (!esc_func_info->in_system_header) {
 					resolve_var_access_alias(esc_func_info, var_access);
+					next_callee++;
+				}
 			}
 		}
 	}
 
-	// Null out irrelevant var accesses
+	// Null out irrelevant var accesses 
+	// (and set mark LockAcquire/LockRelease VAs if any)
 	if (var_accesses != NULL) {
 		for (size_t i = 0; i < var_accesses->size; ++i) {
 			VarAccess *var_access = &var_accesses->data[i];
 
-			if (var_access->esc_func_spelling != NULL) {
+			if (var_access->esc_func_spelling != NULL && // make sure we don't count other function args
+			    var_access->esc_param_idx == 0) {
 				VarAccessType va_lock_type = lock_primitive_type(var_access->esc_func_spelling);
 				if (va_lock_type != VarAccess_Null) {
-					var_access->type = va_lock_type;
+					var_access->type = va_lock_type; // either LockAcquire or LockRelease
 					continue;
 				}
 			}
@@ -802,6 +833,7 @@ void unwind_func_info(FuncInfo *func_info,
 			if (/* var access usr is in locals but never escapes */
 			    !var_access->is_ptr_type &&
 			    var_access->type != VarAccess_Escape &&
+			    !va_is_placeholder_type(var_access->type) &&
 			    aos_contains_string(func_info->locals, var_access->usr)) {
 				var_access->type = VarAccess_Null;
 			}
@@ -814,7 +846,7 @@ void unwind_func_info(FuncInfo *func_info,
 		}
 
 	}
-
+	
 	// Recurse
 	if (func_info->callees && !func_info->in_system_header) {
 		for (size_t i = 0; i < func_info->callees->size; ++i) {
@@ -833,19 +865,12 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 	if (func_info->in_system_header || !func_info->has_definition)
 		return;
 
-	//if (func_info->callees) {
-	//	for (size_t i = 0; i < func_info->callees->size; ++i) {
-	//		build_var_access_footprint(&func_info->callees->data[i],
-	//					   access_footprint);
-	//	}
-	//}
-
 	size_t next_callee = 0; // idx for callees
-	if (func_info->var_accesses) {
+	if (func_info->var_accesses != NULL) {
 		for (size_t i = 0; i < func_info->var_accesses->size; ++i) {
 			VarAccess *working_va = &func_info->var_accesses->data[i];
-	
-			if (working_va->esc_func_usr &&
+
+			if (working_va->type == VarAccess_Call &&
 			    func_info->callees != NULL) {
 				FuncInfo *working_func_info = &func_info->callees->data[next_callee];
 				build_var_access_footprint(working_func_info, access_footprint);
@@ -854,8 +879,7 @@ void build_var_access_footprint(FuncInfo *func_info, VarAccessArr *access_footpr
 				continue;
 			}
 
-			if (working_va->type != VarAccess_Null &&
-			    working_va->type != VarAccess_Call) {
+			if (working_va->type != VarAccess_Null && working_va->type != VarAccess_Call) {
 				push_access_copy(access_footprint, working_va); 
 			}
 		}
@@ -957,15 +981,14 @@ end_recursion:
 }
 
 void find_va_overlap(FuncInfo *func_info_a, 
-		     FuncInfo *func_info_b,
-		     struct prong_priv *prong_priv)
+		     FuncInfo *func_info_b)
 {
 	for (size_t i = 0; i < func_info_a->access_footprint->size; ++i) {
 		for (size_t j = 0; j < func_info_b->access_footprint->size; ++j) {
 			VarAccess *va_i = &func_info_a->access_footprint->data[i];
 			VarAccess *va_j = &func_info_b->access_footprint->data[j];
 
-			if (va_i->type != VarAccess_Null && va_j->type != VarAccess_Null) {
+			if (!va_is_placeholder_type(va_i->type) && !va_is_placeholder_type(va_j->type)) {
 				if (equal_var_accesses(va_i, va_j)) {
 					DynamicAOS *call_trace = init_aos();
 					printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
@@ -985,87 +1008,152 @@ loop_end:
 	}
 }
 
-ProtectionFieldArray lp_field_array_a; // for tracking va_i locking
-ProtectionFieldArray lp_field_array_b; // for tracking va_j locking
-void find_unprotected_va(FuncInfo *func_info_a, 
-		     FuncInfo *func_info_b,
-		     struct prong_priv *prong_priv)
+static size_t get_end_of_branch_idx(VarAccessArr *va_arr, size_t then_blk_idx, size_t branch_depth)
 {
+	size_t old_branch_depth = branch_depth;
+	for(size_t i = then_blk_idx; i < va_arr->size; ++i) {
+		VarAccess *working_va = &va_arr->data[i];
+
+		switch (working_va->type) {
+			case VarAccess_IfStmt:
+				branch_depth++;
+				break;
+			case VarAccess_EndIf:
+				branch_depth--;
+				if (branch_depth == old_branch_depth)
+					return i;
+				break;
+			case VarAccess_ElseStmt:
+				branch_depth--;
+				if (branch_depth == old_branch_depth)
+					return i;
+				break;
+
+			default:
+				continue;
+				break;
+		}
+	}
+
+	return SIZE_MAX;
+}
+
+static void annotate_lock_protection_ranges(FuncInfo *func_info,
+					    ProtectionFieldArray *lp_field_array)
+{
+	size_t branch_depth = 0; // B0 for all accesses in root function compound stmt
+	for (size_t i = 0; i < func_info->access_footprint->size; ++i) {
+		VarAccess *working_va = &func_info->access_footprint->data[i];
+
+		size_t start_of_branch = 0;
+		switch (working_va->type) {
+			case VarAccess_LockAcquire:
+				LockPrimitivePair lock_prim_pair = get_pair_by_lock_func(&lock_pair_array,
+											 working_va->esc_func_spelling);
+				add_lock_protection_field(lp_field_array, 
+							  lock_prim_pair,
+							  working_va, i);
+				break;
+			case VarAccess_LockRelease:
+				set_protection_range_end(lp_field_array,
+							 working_va->usr, i);
+				break;
+			case VarAccess_IfStmt:
+				branch_depth++;
+				start_of_branch = i+1; // Looking for ThenBlock to mark conditional prot range start
+				while (func_info->access_footprint->data[start_of_branch].type != VarAccess_ThenBlock)
+					++start_of_branch;
+				
+//				size_t end_of_branch = get_end_of_branch_idx(func_info->access_footprint,
+//			   					      start_of_branch, branch_depth-1);
+				
+				add_protection_range_fields_active(lp_field_array, start_of_branch, branch_depth);
+				break;
+			case VarAccess_ElseStmt:
+				start_of_branch = i; // There is no condition accesses so we can just set it to i
+
+				//end_of_branch = get_end_of_branch_idx(func_info->access_footprint,
+				//			 	      start_of_branch, branch_depth-1);
+
+				/* Add additional protected sections for lp fields terminated in other branches
+				 * e.g. lp_field->next_prot_range == NULL && lp_field->prot_range_end != SIZE_MAX */
+				add_protection_range_fields_inactive(lp_field_array, start_of_branch, branch_depth-1);
+				break;
+			case VarAccess_EndIf:
+				branch_depth--;
+				break;
+			default:
+				continue;
+				break;
+		}
+	}
+}
+
+void find_unprotected_va(FuncInfo *func_info_a, 
+			 FuncInfo *func_info_b)
+{
+	ProtectionFieldArray lp_field_array_a; // for tracking va_i locking
+	ProtectionFieldArray lp_field_array_b; // for tracking va_j locking
+
 	init_protection_field_array(&lp_field_array_a);
 	init_protection_field_array(&lp_field_array_b);
+
+	annotate_lock_protection_ranges(func_info_a, &lp_field_array_a);
+	annotate_lock_protection_ranges(func_info_b, &lp_field_array_b);
 
 	for (size_t i = 0; i < func_info_a->access_footprint->size; ++i) {
 		for (size_t j = 0; j < func_info_b->access_footprint->size; ++j) {
 			VarAccess *va_i = &func_info_a->access_footprint->data[i];
 			VarAccess *va_j = &func_info_b->access_footprint->data[j];
 
-			/* Add lock protection when LockAcquire, remove when LockRelease */
-			if (va_i->type == VarAccess_LockAcquire) {
-				LockPrimitivePair lock_prim_pair = get_pair_by_lock_func(&lock_pair_array,
-											 va_i->esc_func_spelling);
-
-				if (lock_pair_is_null(lock_prim_pair))
-					print_warn("lock primitve pair not found\n");
-
-				add_lock_protection_field(&lp_field_array_a, 
-							  lock_prim_pair,
-							  va_i->usr);
-			} else if (va_i->type == VarAccess_LockRelease) {
-				remove_lock_protection_field(&lp_field_array_a,
-							     va_i->usr, va_i->name);
-			}
-
-			if (va_j->type == VarAccess_LockAcquire) {
-				LockPrimitivePair lock_prim_pair = get_pair_by_lock_func(&lock_pair_array,
-											 va_i->esc_func_spelling);
-
-				if (lock_pair_is_null(lock_prim_pair))
-					print_warn("lock primitve pair not found\n");
-
-				add_lock_protection_field(&lp_field_array_b,
-							  lock_prim_pair,
-							  va_j->usr, va_j->name);
-			} else if (va_j->type == VarAccess_LockRelease) {
-				remove_lock_protection_field(&lp_field_array_b,
-							     va_j->usr);
-			}
-
-			if (va_i->type != VarAccess_Null && 
-			    va_j->type != VarAccess_Null &&
+			if (!va_is_placeholder_type(va_i->type) &&
+			    !va_is_placeholder_type(va_j->type) &&
 			    equal_var_accesses(va_i, va_j)) {
-				size_t num_matched = 0;
-				for (size_t k = 0; k < lp_field_array_a->size; ++k) {
-					struct lock_protection_field *lp_field_k = &lp_field_array_a.lp_fields[k];
-					if (lp_field_is_null(lp_field_k))
-						continue;
-					for (size_t l = 0; l < lp_field_array_b->size; ++l) {
-						struct lock_protection_field *lp_field_l = &lp_field_array_b.lp_fields[l];
-						if (lp_field_is_null(lp_field_l))
-							continue;
+				SharedProtectionQuality prot_level = 
+					matching_protection_field_arrays(&lp_field_array_a, 
+									 &lp_field_array_b,
+									 i, j);
 
-						
+				bool bad_protection = (prot_level != Shared_Protected ||
+						      (lp_field_array_a.size == 0 || lp_field_array_b.size == 0));
+
+				if (bad_protection) {
+					DynamicAOS *call_trace = init_aos();
+					switch (prot_level) {
+						case Shared_Uncertain:
+							printf("%sCONDITIONALLY PROTECTED SHARED DATA:%s\n", CLR_UNCERTAIN, CLR_RESET);
+							break;
+						default:
+							printf("%sUNPROTECTED SHARED DATA:%s\n", CLR_UNPROTECTED, CLR_RESET);
+							break;
 					}
+					//printf("%sUNPROTECTED SHARED DATA:%s\n", CLR_UNPROTECTED, CLR_RESET);
+					trace_va_overlap(func_info_a, va_i, call_trace);
+					reset_aos(&call_trace);
+					trace_va_overlap(func_info_b, va_j, call_trace);
+					switch (prot_level) {
+						case Shared_Uncertain:
+							printf("%s-------------------%s\n\n", CLR_UNCERTAIN, CLR_RESET);
+							break;
+						default:
+							printf("%s-------------------%s\n\n", CLR_UNPROTECTED, CLR_RESET);
+							break;
+					}
+					va_i->type = VarAccess_Null;
+					va_j->type = VarAccess_Null;
+					free_aos(call_trace);
+					goto loop_end;
 				}
-				DynamicAOS *call_trace = init_aos();
-				printf("%sVariable overlap:%s\n", CLR_VAR, CLR_RESET);
-				trace_va_overlap(func_info_a, va_i, call_trace);
-				reset_aos(&call_trace);
-				trace_va_overlap(func_info_b, va_j, call_trace);
-				printf("%s-------------------%s\n\n", CLR_VAR, CLR_RESET);
-				va_i->type = VarAccess_Null;
-				va_j->type = VarAccess_Null;
-				free_aos(call_trace);
-				goto loop_end;
 			}
 
 loop_end:
 		}
 	}
 
-free_lock_protection_fields:
 	destroy_protection_field_array(&lp_field_array_a);
 	destroy_protection_field_array(&lp_field_array_b);
 }
+
 
 char *mark_postfix_func_name(char *postfix, char **arg_name) {
 	char *split_postfix = strdup(postfix);
@@ -1229,7 +1317,7 @@ prong_error_t parse_func_call(const char *input, DynamicAOS *out) {
 		name_end--;
 	}
 	
-	size_t name_len = name_end - input;
+	size_t name_len = (size_t)(name_end - input);
 	if (name_len == 0) return ERR_SYNTAX;
 	
 	char *func_name = strndup(input, name_len);
@@ -1273,7 +1361,7 @@ prong_error_t parse_func_call(const char *input, DynamicAOS *out) {
 		}
 		
 		if (arg_end > arg_start) {
-			char *arg = strndup(arg_start, arg_end - arg_start);
+			char *arg = strndup(arg_start, (size_t)(arg_end - arg_start));
 			if (!arg) return ERR_OUT_OF_MEMORY;
 			aos_push_string(out, arg);
 			free(arg);
@@ -1403,7 +1491,7 @@ prong_error_t process_args(int argc, char **argv,
 			split_semicolon_list(cmd_arg+LOCK_PAIR_STRLEN, prong_priv->lock_pairs);
 			arg_track_locking = true;
 		} else if (strncmp(cmd_arg, "-j", JOB_COUNT_STRLEN) == 0) {
-			prong_priv->max_threads = atoi(cmd_arg+JOB_COUNT_STRLEN);
+			prong_priv->max_threads = (size_t)atoi(cmd_arg+JOB_COUNT_STRLEN);
 		} else if (strcmp(cmd_arg, "--track-locking") == 0) {
 			arg_track_locking = true;
 		} else if (strcmp(cmd_arg, "--silence-warnings") == 0) {

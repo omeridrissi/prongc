@@ -3,13 +3,14 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
 #include <clang-c/Index.h>
 
 #include "types.h"
 
 #define CURSOR_ARR_INIT_CAP 8
-#define ANCESTOR_NOT_FOUND	SIZE_MAX
-#define NO_IDX			SIZE_MAX
+#define ANCESTOR_NOT_FOUND	UINT_MAX
+#define NO_IDX			UINT_MAX
 
 typedef struct {
 	CXCursor cursor;
@@ -56,14 +57,14 @@ size_t get_num_children(CXCursor cursor);
 
 IfStmtInfo	get_ifstmt_info(CXCursor ifstmt_cursor);
 
-size_t get_param_idx(CXCursor call_expr, CXCursorArr *stack);
+unsigned int get_param_idx(CXCursor call_expr, CXCursorArr *stack);
 
 bool prong_is_system_header(CXSourceLocation loc, DynamicAOS *file_names);
 
 void		print_cursor(CXCursor cursor);
 void		print_cursor_array(CXCursorArr *cursor_array);
 
-CXTranslationUnit	*alloc_tu_array(int length);
-void			free_tu_array(CXTranslationUnit *tu_array, int length);
+CXTranslationUnit	*alloc_tu_array(size_t length);
+void			free_tu_array(CXTranslationUnit *tu_array, size_t length);
 
 

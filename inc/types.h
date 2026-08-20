@@ -6,15 +6,6 @@
 #include <clang-c/CXCompilationDatabase.h>
 #include <pthread.h>
 
-struct lock_protection_field {
-	unsigned int	lock_obj_hash; // based on lock object USR
-
-	unsigned int	lock_func_hash;	// Numbers representing lock/unlock func names
-	unsigned int	unlock_func_hash;
-
-//	VarAccess	*lock_va; // Pointer to LockAcquire VA
-};
-
 typedef struct {
 	struct lock_protection_field *lp_fields;
 	size_t		size;
@@ -63,28 +54,30 @@ typedef enum {
 
 /* Variable access types */
 typedef enum {
+	/* VarAccess marked irrelevant or invalid */
+	VarAccess_Null = 0,
+
 	/* Access types */
-	VarAccess_Read = 0,	// "x = var1"
-	VarAccess_Write,	// "var1 = y"
-	VarAccess_PtrRead,	// reading the value pointer points to
-	VarAccess_PtrWrite,	// writing into the value pointer points to
-	VarAccess_Escape,	// "func(var1)", variable passed as param
+	VarAccess_Read = 1,	// "x = var1"
+	VarAccess_Write = 2,	// "var1 = y"
+	VarAccess_PtrRead = 3,	// reading the value pointer points to
+	VarAccess_PtrWrite = 4,	// writing into the value pointer points to
+	VarAccess_Escape = 5,	// "func(var1)", variable passed as param
 				// to function that we may or may not be able to 
 				// recurse through,
 				// and variable is a pointer or struct.
-	/* Placeholder types (not necessarily tied to any variable) */
-	VarAccess_LockAcquire,	// passed to locking function like mutex_lock
-	VarAccess_LockRelease,	// passed to unlock function like mutex_unlock
-	VarAccess_Call,		// doesn't represent variable modification, instead
-				// serves as filler to mark function calls that might
-				// not accept any arguments
-	VarAccess_IfStmt,	// if statement
-	VarAccess_ElseIfStmt,	// else if statement
-	VarAccess_ElseStmt,	// else statement
-	VarAccess_EndIf,	// end of if statement block
 
-	VarAccess_Null,		// This is for when we don't need the struct
-				// anymore so we null it out
+	/* Placeholder types (not necessarily tied to any variable) */
+	VarAccess_LockAcquire = 6,	// passed to locking function like mutex_lock
+	VarAccess_LockRelease = 7,	// passed to unlock function like mutex_unlock
+	VarAccess_Call = 8,		// doesn't represent variable modification, instead
+					// serves as filler to mark function calls that may 
+					// or may not accept any arguments
+	VarAccess_IfStmt = 9,		// if statement
+	VarAccess_ThenBlock = 10,	// then block start
+	VarAccess_ElseStmt = 11,	// else statement
+	VarAccess_EndIf = 12,		// end of if statement block
+
 } VarAccessType;
 
 /* Struct that will represent a single
@@ -95,13 +88,30 @@ typedef struct {
 	char		*parent_func_name; // Reference to function name, not freeable
 	char		*esc_func_spelling;
 	char		*esc_func_usr; // Only if passed to function
-	size_t		esc_param_idx; // Paremeter idx when passed to func
-	struct lock_protection_field *lp_field; // Info about lock protection being held
-	int		line;
-	int		column;
+	unsigned int	esc_param_idx; // Paremeter idx when passed to func
+	unsigned int	line;
+	unsigned int	column;
 	VarAccessType	type;
 	bool		is_ptr_type;
 } VarAccess;
+
+struct lock_protection_field {
+	VarAccess	*lock_va; // Pointer to LockAcquire VA
+	
+	struct lock_protection_field *next_prot_range;
+	size_t		branch_depth;
+
+	size_t		protection_range_start; // index of LockAcquire VA in access footprint
+	size_t		protection_range_end;	// index of LockRelease VA in access footprint
+
+	unsigned int	lock_obj_hash; // based on lock object USR
+
+	unsigned int	lock_func_hash;	// Numbers representing lock/unlock func names
+	unsigned int	unlock_func_hash;
+
+	bool		is_ll_start; // is start of linked list
+};
+
 
 typedef struct {
 	size_t		size;

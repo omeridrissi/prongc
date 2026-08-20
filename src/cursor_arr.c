@@ -119,24 +119,26 @@ static bool operator_is_assignment(CXCursor cursor) {
 		print_warn("Tried to check if non-BinaryOperator cursor was an assignment\n");
 		return false;
 	}
+
+	return (opcode >= CXBinaryOperator_Assign && opcode <= CXBinaryOperator_OrAssign);
 	/* If it's any type of assignment */
-	switch (opcode) {
-		case CXBinaryOperator_Assign:       // =
-        	case CXBinaryOperator_AddAssign:    // +=
-        	case CXBinaryOperator_SubAssign:    // -=
-        	case CXBinaryOperator_MulAssign:    // *=
-        	case CXBinaryOperator_DivAssign:    // /=
-        	case CXBinaryOperator_RemAssign:    // %=
-        	case CXBinaryOperator_ShlAssign:    // <<=
-        	case CXBinaryOperator_ShrAssign:    // >>=
-        	case CXBinaryOperator_AndAssign:    // &=
-        	case CXBinaryOperator_XorAssign:    // ^=
-        	case CXBinaryOperator_OrAssign:     // |=
-			return true;
-			break;
-        	default:
-			return false;  // Not an assignment operator
-	}
+	//switch (opcode) {
+	//	case CXBinaryOperator_Assign:       // =
+        //	case CXBinaryOperator_AddAssign:    // +=
+        //	case CXBinaryOperator_SubAssign:    // -=
+        //	case CXBinaryOperator_MulAssign:    // *=
+        //	case CXBinaryOperator_DivAssign:    // /=
+        //	case CXBinaryOperator_RemAssign:    // %=
+        //	case CXBinaryOperator_ShlAssign:    // <<=
+        //	case CXBinaryOperator_ShrAssign:    // >>=
+        //	case CXBinaryOperator_AndAssign:    // &=
+        //	case CXBinaryOperator_XorAssign:    // ^=
+        //	case CXBinaryOperator_OrAssign:     // |=
+	//		return true;
+	//		break;
+        //	default:
+	//		return false;  // Not an assignment operator
+	//}
 }
 
 CXCursor get_cursor_of_kind(CXCursorArr *stack, 
@@ -165,6 +167,8 @@ CXCursor get_farthest_memb_expr(CXCursorArr *stack)
 		if (clang_getCursorKind(stack->data[i]) == CXCursor_MemberRefExpr)
 			return stack->data[i];
 	}
+
+	return clang_getNullCursor();
 }
 
 size_t get_farthest_memb_offset(CXCursorArr *stack) 
@@ -272,28 +276,29 @@ CXCursor find_callexpr_definition(CXCursor callexpr_cursor,
 	return pair.callexpr_def;
 }
 
-static enum CXChildVisitResult get_num_children_visitor(CXCursor cursor,
-							CXCursor parent,
-							CXClientData data)
-{
-	size_t *num_children = (size_t*)data;
-
-	*num_children++;
-	return CXChildVisit_Continue;
-}
-
-size_t get_num_children(CXCursor cursor) 
-{
-	size_t num_children = 0;
-	clang_visitChildren(cursor, get_num_children_visitor, &num_children);
-	return num_children;
-}
+//static enum CXChildVisitResult get_num_children_visitor(CXCursor cursor,
+//							CXCursor parent,
+//							CXClientData data)
+//{
+//	size_t *num_children = (size_t*)data;
+//
+//	*num_children++;
+//	return CXChildVisit_Continue;
+//}
+//
+//size_t get_num_children(CXCursor cursor) 
+//{
+//	size_t num_children = 0;
+//	clang_visitChildren(cursor, get_num_children_visitor, &num_children);
+//	return num_children;
+//}
 
 size_t ifstmt_child_idx = 0;
-static enum CXChildVisitResult get_ifstmt_info(CXCursor cursor,
+static enum CXChildVisitResult get_ifstmt_info_visitor(CXCursor cursor,
 					       CXCursor parent,
 					       CXClientData data)
 {
+	(void)parent;
 	IfStmtInfo *if_info = (IfStmtInfo*)data;
 
 	if (ifstmt_child_idx == 0) {
@@ -316,17 +321,17 @@ IfStmtInfo get_ifstmt_info(CXCursor ifstmt_cursor)
 	if_info.then_block = clang_getNullCursor();
 	if_info.else_block = clang_getNullCursor();
 
-	clang_visitChildren(cursor, get_ifstmt_info, &if_info);
+	clang_visitChildren(ifstmt_cursor, get_ifstmt_info_visitor, &if_info);
 	ifstmt_child_idx = 0;
 
 	return if_info;
 }
 
-size_t get_param_idx(CXCursor call_expr, 
+unsigned int get_param_idx(CXCursor call_expr, 
 		     CXCursorArr *stack) 
 {
-	size_t num_args = (size_t)clang_Cursor_getNumArguments(call_expr);
-	for (size_t i = 0; i < num_args; ++i) {
+	unsigned int num_args = clang_Cursor_getNumArguments(call_expr);
+	for (unsigned int i = 0; i < num_args; ++i) {
 		CXCursor arg = clang_Cursor_getArgument(call_expr, i);
 		if (in_cursor_stack(stack, arg)) {
 			return i;
@@ -395,7 +400,7 @@ bool prong_is_system_header(CXSourceLocation loc, DynamicAOS *file_names) {
 }
 
 /* Allocates an array of CXTranslationUnit structs */
-CXTranslationUnit *alloc_tu_array(int length) 
+CXTranslationUnit *alloc_tu_array(size_t length) 
 {
 	CXTranslationUnit *tus;
 	tus = (CXTranslationUnit*)malloc(sizeof(CXTranslationUnit) * length);
@@ -403,9 +408,9 @@ CXTranslationUnit *alloc_tu_array(int length)
 	return tus;
 }
 
-void free_tu_array(CXTranslationUnit *tu_array, int length)
+void free_tu_array(CXTranslationUnit *tu_array, size_t length)
 {
-	for (int i = 0; i < length; ++i) {
+	for (size_t i = 0; i < length; ++i) {
 		clang_disposeTranslationUnit(tu_array[i]);
 	}
 }

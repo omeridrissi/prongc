@@ -10,8 +10,8 @@
 VarAccess	*init_var_access(const char *usr, const char *name,
 				 const char *esc_func_spelling,
 				 const char *esc_func_usr, char *parent_func_name,
-				 size_t esc_func_idx,
-				 int line, int column, VarAccessType type, bool is_ptr_type);
+				 unsigned int esc_func_idx,
+				 unsigned int line, unsigned int column, VarAccessType type, bool is_ptr_type);
 void		free_var_access(VarAccess *var_access);
 
 VarAccessArr	*init_var_access_array();
@@ -21,13 +21,15 @@ void		push_var_access(VarAccessArr *var_access_array,
 				const char *esc_func_spelling,
 				const char *usr, const char *name, 
 				const char *esc_func_usr, char *parent_func_name,
-				size_t esc_func_idx,
-				int line, int column, VarAccessType type, bool is_ptr_type);
+				unsigned int esc_func_idx,
+				unsigned int line, unsigned int column, VarAccessType type, bool is_ptr_type);
 
 void		push_access_copy(VarAccessArr *var_access_array, VarAccess *var_access);
 
 bool		equal_var_accesses(VarAccess *va_a, VarAccess *va_b);
 bool		equal_var_access_structs(VarAccess *va_a, VarAccess *va_b);
+
+bool		va_is_placeholder_type(VarAccessType va_type);
 
 void		print_var_access(VarAccess *var_access, 
 				 int indentation);

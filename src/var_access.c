@@ -7,8 +7,8 @@
 VarAccess *init_var_access(const char *usr, const char *name,
 			   const char *esc_func_spelling,
 			   const char *esc_func_usr, char *parent_func_name,
-			   size_t esc_param_idx,
-			   int line, int column, VarAccessType type,
+			   unsigned int esc_param_idx,
+			   unsigned int line, unsigned int column, VarAccessType type,
 			   bool is_ptr_type)
 {
 	VarAccess *var_access;
@@ -16,9 +16,13 @@ VarAccess *init_var_access(const char *usr, const char *name,
 
 	if (usr != NULL)
 		var_access->usr = strdup(usr);
+	else 
+		var_access->usr = NULL;
 
 	if (name != NULL)
 		var_access->name = strdup(name);
+	else
+		var_access->name = NULL;
 
 	var_access->parent_func_name = parent_func_name;
 
@@ -80,8 +84,8 @@ void push_var_access(VarAccessArr *var_access_array,
 			const char *usr, const char *name,
 			const char *esc_func_spelling,
 			const char *esc_func_usr, char *parent_func_name,
-			size_t esc_param_idx, 
-			int line, int column, VarAccessType type,
+			unsigned int esc_param_idx, 
+			unsigned int line, unsigned int column, VarAccessType type,
 			bool is_ptr_type)
 {
 	VarAccess *var_access = init_var_access(usr, name, esc_func_spelling,
@@ -165,6 +169,15 @@ void print_var_access(VarAccess *var_access, int indentation)
 		case VarAccess_Call:
 			printf("function call\n");
 			break;
+		case VarAccess_IfStmt:
+			printf("if statement\n");
+			break;
+		case VarAccess_ElseStmt:
+			printf("else statement\n");
+			break;
+		case VarAccess_EndIf:
+			printf("endif\n");
+			break;
 		case VarAccess_Null:
 			printf("NULL\n");
 			break;
@@ -176,7 +189,7 @@ void print_var_access(VarAccess *var_access, int indentation)
 		printf("%*s|   esc func usr: %s\n", x, "", var_access->esc_func_spelling);
 	
 	if (var_access->esc_param_idx != NO_IDX)
-		printf("%*s|   esc param idx: %zu\n", x, "", var_access->esc_param_idx);
+		printf("%*s|   esc param idx: %u\n", x, "", var_access->esc_param_idx);
 
 	if (var_access->is_ptr_type) 
 		printf("%*s|   *is pointer\n", x, "");
@@ -192,7 +205,13 @@ bool equal_var_accesses(VarAccess *va_a, VarAccess *va_b)
 
 bool equal_var_access_structs(VarAccess *va_a, VarAccess *va_b) 
 {
-	return (memcmp(va_a->usr, va_b->usr, sizeof(VarAccess)) == 0);
+	return (memcmp(va_a, va_b, sizeof(VarAccess)) == 0);
+}
+
+bool va_is_placeholder_type(VarAccessType va_type)
+{
+	return  (va_type == VarAccess_Null) || 
+		(va_type >= VarAccess_Call && va_type <= VarAccess_EndIf);
 }
 
 void print_var_access_array(VarAccessArr *var_access_array, int indentation) 
