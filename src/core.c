@@ -159,6 +159,9 @@ static enum CXChildVisitResult prong_visitor_walk_func(CXCursor current_cursor,
 					
 				if (clang_getCursorKind(tail) == CXCursor_IfStmt &&
 				    arg_track_locking) {
+					if (prong_priv->current_func->var_accesses == NULL)
+						prong_priv->current_func->var_accesses = init_var_access_array();
+
 					push_var_access(prong_priv->current_func->var_accesses,
 							NULL, NULL,
 							NULL, NULL,

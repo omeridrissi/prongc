@@ -1,8 +1,9 @@
 #include <stdint.h>
+#include <limits.h>
 #include "var_access.h"
 #include "log.h"
 
-#define NO_IDX SIZE_MAX
+#define NO_IDX UINT_MAX
 
 VarAccess *init_var_access(const char *usr, const char *name,
 			   const char *esc_func_spelling,
@@ -69,7 +70,7 @@ VarAccessArr *init_var_access_array()
 
 	var_access_array->size = 0;
 	var_access_array->capacity = VAR_ACC_ARR_INIT_CAP;
-	var_access_array->data = malloc(sizeof(*var_access_array)*VAR_ACC_ARR_INIT_CAP);
+	var_access_array->data = malloc(sizeof(VarAccess)*VAR_ACC_ARR_INIT_CAP);
 
 	return var_access_array;
 }
@@ -93,15 +94,14 @@ void push_var_access(VarAccessArr *var_access_array,
 						esc_param_idx, line,
 						column, type, is_ptr_type);
 
-	if ((var_access_array->size+1)*sizeof(VarAccess) > var_access_array->capacity) {
+	if (var_access_array->size >= var_access_array->capacity-1) {
 		var_access_array->capacity *= 2;
 		var_access_array->data = reallocarray(var_access_array->data,
 						var_access_array->capacity,
 						sizeof(VarAccess));
 	}
 
-	memcpy(var_access_array->data+var_access_array->size,
-			var_access, sizeof(VarAccess));
+	var_access_array->data[var_access_array->size] = *var_access;
 	var_access_array->size++;
 
 	free(var_access);
