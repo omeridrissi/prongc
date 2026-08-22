@@ -372,7 +372,6 @@ static void get_lp_fields_in_range(ProtectionFieldArray *lp_field_array,
 		int ll_depth = 0;
 		if (lp_field->is_ll_start) { // make sure we only pulling base prot ranges
 next:			
-			print_debug("ll_depth = %d\n", ll_depth);
 			bool conditional_prot = lp_cond_prot(lp_field, va_idx);
 
 			if ((va_idx > lp_field->protection_range_start &&
@@ -385,7 +384,6 @@ next:
 			if (lp_field->next_prot_range != NULL) {
 				lp_field = lp_field->next_prot_range;
 				ll_depth++;
-				print_debug("nexting\n");
 				goto next;
 			}
 			
