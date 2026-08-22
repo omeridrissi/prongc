@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "lock_tracking.h"
 #include "var_access.h"
 
@@ -175,7 +176,7 @@ void init_protection_field_array(ProtectionFieldArray *lp_field_array)
 	lp_field_array->lp_fields = malloc(sizeof(struct lock_protection_field)*NUM_LP_FIELDS);
 	// zero everything out
 	memset(lp_field_array->lp_fields, '\0', 
-	       sizeof(ProtectionFieldArray)*NUM_LP_FIELDS);
+	       sizeof(struct lock_protection_field)*NUM_LP_FIELDS);
 	lp_field_array->size = 0;
 	lp_field_array->capacity = NUM_LP_FIELDS;
 }
@@ -195,6 +196,22 @@ bool lp_field_is_null(struct lock_protection_field *lp_field)
 		return false;
 }
 
+/* Updates lp_field->next_prot_range pointers to match new allocation */
+static void update_lp_field_array_pointers(ProtectionFieldArray *lp_field_array,
+					   uintptr_t old_base_ptr)
+{
+	uintptr_t new_base_ptr = (uintptr_t)lp_field_array->lp_fields;
+	ptrdiff_t realloc_offset = (ptrdiff_t)(new_base_ptr - old_base_ptr);
+	for (size_t i = 0; i < lp_field_array->size; ++i) {
+		struct lock_protection_field *lp_field = &lp_field_array->lp_fields[i];
+
+		if (lp_field->next_prot_range != NULL) {
+			lp_field->next_prot_range = 
+				(struct lock_protection_field*)((char*)lp_field->next_prot_range + realloc_offset);
+		}
+	}
+}
+
 /* Adds a lock protection field to the lp_field stack,
  * grows dynamically if more space is needed, any added
  * memory is nulled out */
@@ -205,12 +222,16 @@ void add_lock_protection_field(ProtectionFieldArray *lp_field_array,
 {
 	size_t lp_array_size = lp_field_array->size;
 	if (lp_array_size >= lp_field_array->capacity) {
+		size_t old_cap = lp_field_array->capacity;
 		lp_field_array->capacity *= 2;
+		uintptr_t old_base_ptr = (uintptr_t)lp_field_array->lp_fields;
+
 		lp_field_array->lp_fields = reallocarray(lp_field_array->lp_fields,
 							 lp_field_array->capacity,
 							 sizeof(struct lock_protection_field));
 		memset(lp_field_array->lp_fields+lp_array_size, '\0',
-			lp_field_array->capacity-lp_array_size);
+			lp_field_array->capacity - old_cap);
+		update_lp_field_array_pointers(lp_field_array, old_base_ptr);
 	}
 
 	struct lock_protection_field *lp_field = &lp_field_array->lp_fields[lp_array_size];
@@ -225,17 +246,22 @@ struct lock_protection_field *add_lock_protection_copy(ProtectionFieldArray *lp_
 {
 	size_t lp_array_size = lp_field_array->size;
 	if (lp_array_size >= lp_field_array->capacity-1) {
+		size_t old_cap = lp_field_array->capacity;
 		lp_field_array->capacity *= 2;
+		uintptr_t old_base_ptr = (uintptr_t)lp_field_array->lp_fields;
+
 		lp_field_array->lp_fields = reallocarray(lp_field_array->lp_fields,
 							 lp_field_array->capacity,
-							 sizeof(struct lock_protection_field));
+							 sizeof(struct lock_protection_field));	
 		memset(lp_field_array->lp_fields+lp_array_size, '\0',
-			lp_field_array->capacity-lp_array_size);
+			lp_field_array->capacity - old_cap);
+		update_lp_field_array_pointers(lp_field_array, old_base_ptr);
 	}
 
 	struct lock_protection_field *lp_field = &lp_field_array->lp_fields[lp_array_size];
 	*lp_field = *lp_field_in;
 	lp_field->is_ll_start = false;
+	lp_field->next_prot_range = NULL;
 
 	lp_field_array->size++;
 
@@ -343,21 +369,27 @@ static void get_lp_fields_in_range(ProtectionFieldArray *lp_field_array,
 {
 	for (size_t i = 0; i < lp_field_array->size; ++i) {
 		struct lock_protection_field *lp_field = &lp_field_array->lp_fields[i];
+		int ll_depth = 0;
 		if (lp_field->is_ll_start) { // make sure we only pulling base prot ranges
-			while (lp_field != NULL) {
-				
-				//bool conditional_prot = lp_cond_prot(lp_field, va_idx);
-				bool conditional_prot = false;
+next:			
+			print_debug("ll_depth = %d\n", ll_depth);
+			bool conditional_prot = lp_cond_prot(lp_field, va_idx);
 
-				if ((va_idx > lp_field->protection_range_start &&
-				     va_idx < lp_field->protection_range_end) ||
-				    conditional_prot) {
-					lp_fields[*num_protections] = lp_field; // in range so active
-					*num_protections += 1;
-				}
-				
-				lp_field = lp_field->next_prot_range;
+			if ((va_idx > lp_field->protection_range_start &&
+			     va_idx < lp_field->protection_range_end) ||
+			    conditional_prot) {
+				lp_fields[*num_protections] = lp_field; // in range so active
+				*num_protections += 1;
 			}
+		
+			if (lp_field->next_prot_range != NULL) {
+				lp_field = lp_field->next_prot_range;
+				ll_depth++;
+				print_debug("nexting\n");
+				goto next;
+			}
+			
+			continue;
 		}
 	}
 }
@@ -383,8 +415,8 @@ SharedProtectionQuality matching_protection_field_arrays(ProtectionFieldArray *l
 
 	memset(&active_protections_a, '\0', sizeof(void*)*lp_field_array_a->size);
 	memset(&active_protections_b, '\0', sizeof(void*)*lp_field_array_b->size);
-	size_t num_protections_a = 0,
-	       num_protections_b = 0;
+	size_t num_protections_a = 0;
+	size_t num_protections_b = 0;
 
 	get_lp_fields_in_range(lp_field_array_a, active_protections_a, &num_protections_a, va_idx_i);
 	get_lp_fields_in_range(lp_field_array_b, active_protections_b, &num_protections_b, va_idx_j);
