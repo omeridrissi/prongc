@@ -1535,10 +1535,12 @@ void print_usage(const char *prog_name) {
 	printf("  -j[max_threads]     Specify maximum number of concurrent threads for parsing stage\n");
 	printf("  --verbose           Enable verbose output\n");
 	printf("  --silence-warnings  Don't show compiler warnings. However, the user is notified when they are present.\n");
+	printf("  --track-locking     Find unprotected or conditionally protected shared variable accesses between the fucntions.\n");
 	printf("  --help              Show this help message and exit\n");
 	printf("\n");
 	printf("Examples:\n");
 	printf("  %s --files=\"main.c,util.c\" --functions=\"init();run(arg)\"\n", prog_name);
 	printf("  %s --files=\"a.c,b.c,c.c\" --functions=\"foo(arg);bar(arg)\" --verbose\n\n", prog_name);
+	printf("  %s --files=\"main.c,util.c\" --functions=\"thread1(arg);thread2(arg)\" --track-locking\n", prog_name);
 }
 
