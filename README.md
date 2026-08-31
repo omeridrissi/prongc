@@ -88,6 +88,25 @@ bar(bool shared_arg, size_t arg3) → file1.c, line: 699, col: 25  │ READ : sh
 -------------------
 ```
 
+## Lock Tracking
+
+```bash
+prongc --files="main.c,util.c" --functions="thread1(arg);thread2(arg)" --track-locking
+```
+This would find all shared unprotected accesses between `thread1()` and `thread2()`.
+
+Example output:
+```c
+UNPROTECTED SHARED DATA:
+thread1(void *) → code_sample/file.c, line: 14, col: 9  │ WRITE TO ADDR : shared_array (ptr)
+                shared_array[i] = shared_array[0] * i;  // UNPROTECTED
+                ^
+thread2(void *) → code_sample/file.c, line: 22, col: 9  │ WRITE TO ADDR : shared_array (ptr)
+                shared_array[i] = 0;  // Race with thread1's loop
+                ^
+-------------------
+```
+
 ## Use cases
 
 - Detect hidden shared state between functions
